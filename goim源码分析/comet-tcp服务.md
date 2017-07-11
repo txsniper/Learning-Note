@@ -272,7 +272,10 @@ func (server *Server) serveTCP(conn *net.TCPConn, rp, wp *bytes.Pool, tr *itime.
 
 dispatchTCP流程：
 1. 等待serveTCP通知(serveTCP会执行ch.Signal()通知一个协议数据包读取完毕 )。
-2. 如果是结束
+2. 如果是结束通知(ProtoFinish)，则设置finish标志，然后跳转到failed。
+3. 如果是读取完成通知(ProtoReady)，从缓存中读取serveTCP中构造完成的数据包，然后发送给客户端。
+4. 其他情况，直接发送给客户端。
+5. 2,3,4步中如果发送失败，则直接跳转到failed。failed中关闭连接然后返回。
 
 ```
 // dispatch accepts connections on the listener and serves requests
@@ -300,6 +303,7 @@ func (server *Server) dispatchTCP(key string, conn *net.TCPConn, wr *bufio.Write
 			log.Debug("key:%s dispatch msg:%v", key, *p)
 		}
 		switch p {
+		// 结束通知
 		case proto.ProtoFinish:
 			if white {
 				DefaultWhitelist.Log.Printf("key: %s receive proto finish\n", key)
@@ -311,6 +315,7 @@ func (server *Server) dispatchTCP(key string, conn *net.TCPConn, wr *bufio.Write
 			goto failed
 		case proto.ProtoReady:
 			// fetch message from svrbox(client send)
+			// 读取完成通知，从缓存中获取消息，然后写入TCP并从缓存中移除
 			for {
 				if p, err = ch.CliProto.Get(); err != nil {
 					err = nil // must be empty error
@@ -329,6 +334,7 @@ func (server *Server) dispatchTCP(key string, conn *net.TCPConn, wr *bufio.Write
 				ch.CliProto.GetAdv()
 			}
 		default:
+		// 其他的情况，直接发送
 			if white {
 				DefaultWhitelist.Log.Printf("key: %s start write server proto%v\n", key, p)
 			}
@@ -358,6 +364,7 @@ failed:
 	if err != nil {
 		log.Error("key: %s dispatch tcp error(%v)", key, err)
 	}
+	// 返回之前关闭连接
 	conn.Close()
 	wp.Put(wb)
 	// must ensure all channel message discard, for reader won't blocking Signal

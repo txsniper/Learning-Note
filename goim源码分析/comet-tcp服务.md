@@ -1,5 +1,3 @@
-### 目录
-- [tcp简介] (#一. tcp简介)
 ### 一. tcp简介
 tcp.go提供了tcp协议的消息推送，websocket.go则提供了websocket协议的消息推送
 

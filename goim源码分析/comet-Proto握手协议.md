@@ -36,7 +36,7 @@ Body        : 不定长内容，协议体
 
 ### 二. 对协议的操作
 #### 2.1 协议写入
-注意 ***bytes.Writer和bufio.Writer的不同 ***
+注意 ***bytes.Writer和bufio.Writer的不同***
 
 bytes.Writer ： 字节缓冲区，不包含其他的内容  
 bufio.Writer ： 封装了了io通道和缓冲区

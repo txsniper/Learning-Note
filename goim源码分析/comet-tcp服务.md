@@ -85,8 +85,9 @@ func acceptTCP(server *Server, lis *net.TCPListener) {
 
 #### 2.2 处理连接
 对于新到来的客户端连接，所进行的操作无非是接收客户端数据，然后做相应的处理。serveTCP主要完成的就是这部分的工作，serveTCP的关键点：
-1. 流程交互：==将接收数据操作和处理操作拆分开来，在serveTCP中新建了goroutine来执行处理操作（调用dispatchTCP函数），serveTCP所在的 goroutine则专门完成接收数据的操作，两个goroutine之间通过go channel通信。==
-2. 数据交互：==为了解决接收数据和处理数据速度不匹配问题，利用Proto环形缓冲区(comet/ring.go)来缓存数据==
+1. 流程交互：`将接收数据操作和处理操作拆分开来，在serveTCP中新建了goroutine来执行处理操作（调用dispatchTCP函数），serveTCP所在的 goroutine则专门完成接收数据的操作，两个goroutine之间通过go channel通信。`
+2. 数据交互：`为了解决接收数据和处理数据速度不匹配问题，利用Proto环形缓冲区(comet/ring.go)来缓存数据`
+
 ```
 // auth for goim handshake with client, use rsa & aes.
 func (server *Server) authTCP(rr *bufio.Reader, wr *bufio.Writer, p *proto.Proto) (key string, rid int32, heartbeat time.Duration, err error) {

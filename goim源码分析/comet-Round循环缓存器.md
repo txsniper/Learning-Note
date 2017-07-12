@@ -1,5 +1,5 @@
 ### 一. Round
-Round中封装了多个读写缓存和多个定时器管理器，使用的时候轮询使用。
+Round提供了对资源的逻辑封装，它并不是一个简单的资源池，而是包含了多个资源池，当新建Channel的时候，会根据计数来返回对应的资源池，**注意，多个连接可以使用相同的资源池，Round的作用是作为资源池的分配器。**
 
 ```
 type RoundOptions struct {
@@ -31,14 +31,14 @@ func NewRound(options RoundOptions) (r *Round) {
 	r.options = options
 	
 	// reader
-	// 初始化读缓存
+	// 初始化多个读缓存池
 	r.readers = make([]bytes.Pool, options.Reader)
 	for i = 0; i < options.Reader; i++ {
 		r.readers[i].Init(options.ReadBuf, options.ReadBufSize)
 	}
 	
 	// writer
-	// 初始化写缓存
+	// 初始化多个写缓存池
 	r.writers = make([]bytes.Pool, options.Writer)
 	for i = 0; i < options.Writer; i++ {
 		r.writers[i].Init(options.WriteBuf, options.WriteBufSize)
@@ -54,7 +54,7 @@ func NewRound(options RoundOptions) (r *Round) {
 }
 ```
 ### 二.获取资源
-通过取模方式获取资源
+通过计数取模方式获取资源池，平衡每个资源池的使用。
 ```
 // Timer get a timer.
 func (r *Round) Timer(rn int) *time.Timer {

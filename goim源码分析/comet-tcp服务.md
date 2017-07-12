@@ -118,10 +118,10 @@ func (server *Server) authTCP(rr *bufio.Reader, wr *bufio.Writer, p *proto.Proto
 }
 ```
 serveTCP( Server.serveTCP)流程：
-1. 从Pool中获取空闲的读写缓冲区，为新连接构造一个Channel。
+1. 从Pool中获取空闲的读写缓冲区，为新连接构造一个Channel。新连接使用的缓冲区，定时器都来自Round对象。Round对象作为一个资源池，为Channel提供可重复使用的资源，避免了生成和销毁带来的性能损失。
 2. 初始化Channel的读写缓冲区。
 3. 准备进行握手操作，首先设置握手连接的超时时间，超时后自动关闭连接。
-4. 调用serve.authTCP完成注册验证操作，***authTCP会请求后端的logic服务，logic服务会返回分配的key和roomId***
+4. 调用serve.authTCP完成注册验证操作，**authTCP会请求后端的logic服务，logic服务会返回分配的key和roomId**
 5. 注册完成后，准备进行后面的业务操作，首先设定连接的心跳时间。
 6. ==关键的一步，新建一个goroutine 用来执行数据处理(dispatchTCP)，当前的gorouine则主要进行数据接收==
 7. 在循环中不断的从缓冲区中读取数据，构造Proto对象，存放到Proto缓冲区。然后通知数据处理goroutine

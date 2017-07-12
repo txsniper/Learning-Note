@@ -1,4 +1,5 @@
 ### 一. 协议格式
+comet中客户端和服务端的交互全部通过Proto格式的协议数据包，根据其中的Operation来判断需要执行的操作。
 #### 1.1 协议内容
 ```
 // Proto is a request&response written before every goim connect.  It is used internally

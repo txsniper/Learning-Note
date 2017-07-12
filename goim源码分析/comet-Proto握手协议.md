@@ -35,7 +35,7 @@ Body        : 不定长内容，协议体
 
 
 ### 二. 对协议的操作
-#### 2.1 协议写入
+#### 2.1 构造协议结构体并写入
 注意 ***bytes.Writer和bufio.Writer的不同***
 
 bytes.Writer ： 字节缓冲区，不包含其他的内容  
@@ -160,7 +160,7 @@ func (p *Proto) WriteWebsocket(wr *websocket.Conn) (err error) {
 注意： wr.WriteJSON([]*Proto{p})  
 利用 p 构造一个列表，列表中的元素为 *Proto 类型
 
-#### 2.2 协议读取
+#### 2.2 读取数据构造协议结构体
 
 利用读取的数据构造Proto对象
 ```

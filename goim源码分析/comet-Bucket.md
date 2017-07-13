@@ -144,7 +144,7 @@ func (b *Bucket) DelRoom(rid int32) {
 
 ### 五. 发送消息
 1. 向Bucket下面所有的Channel推送消息 (Broadcast)
-2. 向某一个Room推送消息 (BroadcastRoom)，采用轮询的方式从routines中选择一个发送消息。
+2. 向某一个Room推送消息 (BroadcastRoom)，采用轮询的方式从routines中选择一个执行发送任务。
 
 ```
 // 向所有的Channel推送消息
@@ -186,7 +186,7 @@ func (b *Bucket) roomproc(c chan *proto.BoardcastRoomArg) {
 ```
 ### 六. 其他函数
 
-1. 获取online number 大于0的所有room id，这里利用empty struct作为map的值。
+1. 获取Online大于0的所有room id (Online代表room中Channel的数量)，这里利用empty struct作为map的值。
 
 ```
 // Rooms get all room id where online number > 0.

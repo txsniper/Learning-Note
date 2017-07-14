@@ -555,9 +555,11 @@ void co_release( stCoRoutine_t *co )
 
 void co_swap(stCoRoutine_t* curr, stCoRoutine_t* pending_co);
 
+// 切换到 co 协程
 void co_resume( stCoRoutine_t *co )
 {
 	stCoRoutineEnv_t *env = co->env;
+	// 当前执行的协程
 	stCoRoutine_t *lpCurrRoutine = env->pCallStack[ env->iCallStackSize - 1 ];
 	if( !co->cStart )
 	{

@@ -126,6 +126,7 @@ serveTCP( Server.serveTCP)流程：
 6. ==关键的一步，新建一个goroutine 用来执行数据处理(dispatchTCP)，当前的gorouine则主要进行数据接收==
 7. 在循环中不断的从缓冲区中读取数据，构造Proto对象，存放到Proto缓冲区。然后通知数据处理goroutine
 
+**新连接的Channel十分重要，它将等待两个方向的消息(客户端发送给Comet，Push服务发送给客户端)。**
 ```
 func serveTCP(server *Server, conn *net.TCPConn, r int) {
         // 选择定时器和读写缓冲区 
@@ -270,11 +271,16 @@ func (server *Server) serveTCP(conn *net.TCPConn, rp, wp *bytes.Pool, tr *itime.
 
 ```
 
-dispatchTCP流程：
-1. 等待serveTCP通知(serveTCP会执行ch.Signal()通知一个协议数据包读取完毕 )。
+dispatchTCP：
+dispatchTCP的核心在于等待两个方向的通知，然后执行对应的处理：
+1. 客户端向Comet发送的通知：heartbeat, disconnect (serveTCP函数中调用ch.Signal())
+2. 后端的Push服务向客户端push消息：需要Comet服务将消息发送给对应的客户端. (comet/rpc.go中PushMsg等调用)
+
+dispatchTCP的整体流程
+1. 等待客户端对应的Channel收到通知。
 2. 如果是结束通知(ProtoFinish)，则设置finish标志，然后跳转到failed。
-3. 如果是读取完成通知(ProtoReady)，从缓存中读取serveTCP中构造完成的数据包，然后发送给客户端。
-4. 其他情况，直接发送给客户端。
+3. 如果是读取完成通知(ProtoReady，由serveTCP)，从缓存中读取serveTCP中构造完成的数据包，然后发送给客户端。
+4. 其他情况(**后端push给客户端的消息**)，不做任何中间处理，直接发送给客户端。
 5. 2,3,4步中如果发送失败，则直接跳转到failed。failed中关闭连接然后返回。
 
 ```
@@ -294,7 +300,7 @@ func (server *Server) dispatchTCP(key string, conn *net.TCPConn, wr *bufio.Write
 		if white {
 			DefaultWhitelist.Log.Printf("key: %s wait proto ready\n", key)
 		}
-		// step1 : 等待通知 (serveTCP会执行ch.Signal()通知 )
+		// step1 : 等待通知
 		var p = ch.Ready()
 		if white {
 			DefaultWhitelist.Log.Printf("key: %s proto ready\n", key)
@@ -315,7 +321,7 @@ func (server *Server) dispatchTCP(key string, conn *net.TCPConn, wr *bufio.Write
 			goto failed
 		case proto.ProtoReady:
 			// fetch message from svrbox(client send)
-			// 读取完成通知，从缓存中获取消息，然后写入TCP并从缓存中移除
+			// 读取完成通知(读取了从客户端发送来的消息)，从缓存中获取消息，然后写入TCP并从缓存中移除
 			for {
 				if p, err = ch.CliProto.Get(); err != nil {
 					err = nil // must be empty error
@@ -334,7 +340,7 @@ func (server *Server) dispatchTCP(key string, conn *net.TCPConn, wr *bufio.Write
 				ch.CliProto.GetAdv()
 			}
 		default:
-		// 其他的情况，直接发送
+		// 其他的情况(后端给客户端push消息)，直接发送
 			if white {
 				DefaultWhitelist.Log.Printf("key: %s start write server proto%v\n", key, p)
 			}

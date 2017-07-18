@@ -15,6 +15,7 @@ comet整体分为3个部分:
 
 ## 客户端连接管理(以tcp.go为例)
 ### 新建连接
+
 当新的客户端连接到来时，很重要的工作是对客户端进行认证，并分配对应的subkey和room，调用Logic服务的Connect接口实现。
 
 ```
@@ -56,4 +57,71 @@ Logic服务的Connect接口需要两个参数：
 Connect接口返回两个参数:
 1. key : 主题id，支持多个客户端关注相同的主题。
 2. RoomId : 房间号
+
+客户端连接依照上面两个维度进行划分。
+
+### 客户端心跳检测
+[详细见comet-tcp服务(serveTCP,dispatchTCP函数)](comet-tcp服务.md)
+
+### 转发Push服务数据
+在启动comet时，调用InitRPCPush函数启动RPC服务，提供接口用于接收Push服务的消息。  [详细见RPCPush](comet-RPCPush.md)  
+rpc.go中提供了提供了多种Push消息的方式，dispatchTCP中执行连接处理的goroutine会在Channel收到消息后直接转发给客户端。
+```
+// main.go
+// start rpc
+if err := InitRPCPush(Conf.RPCPushAddrs); err != nil {
+	panic(err)
+}
+
+// rpc.go
+func (this *PushRPC) PushMsg(arg *proto.PushMsgArg, reply *proto.NoReply) (err error) {
+	var (
+		bucket  *Bucket
+		channel *Channel
+	)
+	if arg == nil {
+		err = ErrPushMsgArg
+		return
+	}
+	bucket = DefaultServer.Bucket(arg.Key)
+	if channel = bucket.Channel(arg.Key); channel != nil {
+		err = channel.Push(&arg.P)
+	}
+	return
+}
+
+// tcp.go dispatchTCP.go
+	for {
+		...
+		var p = ch.Ready()
+		...
+		switch p {
+		case proto.ProtoFinish:
+			finish = true
+			goto failed
+		case proto.ProtoReady:
+			// fetch message from svrbox(client send)
+			for {
+				if p, err = ch.CliProto.Get(); err != nil {
+					err = nil // must be empty error
+					break
+				}
+				if err = p.WriteTCP(wr); err != nil {
+					goto failed
+				}
+				p.Body = nil // avoid memory leak
+				ch.CliProto.GetAdv()
+			}
+		default:
+			// server send
+			if err = p.WriteTCP(wr); err != nil {
+				goto failed
+			}
+		}
+		// only hungry flush response
+		if err = wr.Flush(); err != nil {
+			break
+		}
+	}
+```
 

@@ -563,7 +563,7 @@ void co_resume( stCoRoutine_t *co )
 	stCoRoutine_t *lpCurrRoutine = env->pCallStack[ env->iCallStackSize - 1 ];
 	if( !co->cStart )
 	{
-		// 配置寄存器
+		// 配置寄存器和函数栈, CoRoutineFunc 配置为栈中返回函数, co配置为返回函数的参数
 		coctx_make( &co->ctx,(coctx_pfn_t)CoRoutineFunc,co,0 );
 		co->cStart = 1;
 	}
@@ -882,10 +882,13 @@ void FreeEpoll( stCoEpoll_t *ctx )
 	free( ctx );
 }
 
+// 获取当前正在执行的协程
 stCoRoutine_t *GetCurrCo( stCoRoutineEnv_t *env )
 {
 	return env->pCallStack[ env->iCallStackSize - 1 ];
 }
+
+// 获取当前线程正在执行的协程
 stCoRoutine_t *GetCurrThreadCo( )
 {
 	stCoRoutineEnv_t *env = co_get_curr_thread_env();
@@ -904,6 +907,7 @@ int co_poll_inner( stCoEpoll_t *ctx,struct pollfd fds[], nfds_t nfds, int timeou
 		timeout = stTimeoutItem_t::eMaxTimeout;
 	}
 	int epfd = ctx->iEpollFd;
+	// 获取当前正在执行的协程
 	stCoRoutine_t* self = co_self();
 
 	//1.struct change

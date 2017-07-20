@@ -1,5 +1,6 @@
 ## 协程执行流程
-这里以example_specific的执行流程为例解释一下协程是如何切换的，**例子中的协程都是非共享栈**
+这里以example_specific的执行流程为例解释一下协程是如何切换的，**例子中的协程都是非共享栈**。  
+example_specific测试了协程私有变量(**类似于线程私有变量**)
 
 ## 背景说明
 ### 1. 协程是怎样执行的
@@ -9,4 +10,58 @@
 从这里我们可以看出整体的执行流程是:  
 主协程------->业务协程A------->主协程-------->业务协程B  
 业务协程A和业务协程B之间的执行依赖于主协程的调度
+### 3. 如何处理定时器和阻塞函数
+在协程的执行函数中，有时我们会sleep一段时间或者调用一些阻塞函数(比如IO函数，read/write)，如果我们不进行处理，那么会直接阻塞协程所在的线程，为了处理这种情况，我们需要对这些函数进行Hook，提供对应的非阻塞的函数。  
+IO函数实质上是对文件描述符的读写操作，sleep则是等待一段时间，然后超时。可同时等待多个文件描述符的读写操作，同时还包含超时，**epoll !!!**
+
+## 整体流程
+### 功能函数
+
+新建协程，如果当前线程没有创建协程执行环境，则初始化协程执行环境，同时创建线程的主协程，**主协程充当调度者的角色**
+```
+// 新建协程
+int co_create( stCoRoutine_t **ppco,const stCoRoutineAttr_t *attr,pfn_co_routine_t pfn,void *arg )
+{
+	// step1 : 如果当前线程还没有初始化执行环境，则首先进行初始化
+	if( !co_get_curr_thread_env() ) 
+	{
+		co_init_curr_thread_env();
+	}
+
+	// step2 : 创建协程
+	stCoRoutine_t *co = co_create_env( co_get_curr_thread_env(), attr, pfn,arg );
+	*ppco = co;
+	return 0;
+}
+```
+
+协程切换，有两种切换方式：
+1. 主动切换到某个指定的协程(主协程常用来主动切换到业务协程)
+2. 主动让出执行线程，业务协程执行完毕后会主动让出执行。
+```
+// 切换到 co 协程
+void co_resume( stCoRoutine_t *co )
+{
+	stCoRoutineEnv_t *env = co->env;
+	// 当前执行的协程
+	stCoRoutine_t *lpCurrRoutine = env->pCallStack[ env->iCallStackSize - 1 ];
+	if( !co->cStart )
+	{
+		// 配置寄存器和函数栈, CoRoutineFunc 配置为栈中返回函数, co配置为返回函数的参数
+		coctx_make( &co->ctx,(coctx_pfn_t)CoRoutineFunc,co,0 );
+		co->cStart = 1;
+	}
+	env->pCallStack[ env->iCallStackSize++ ] = co;
+	co_swap( lpCurrRoutine, co );
+}
+
+void co_yield_env( stCoRoutineEnv_t *env )
+{
+	// 从pCallStack中取出下一个执行的协程，进行切换
+	stCoRoutine_t *last = env->pCallStack[ env->iCallStackSize - 2 ];
+	stCoRoutine_t *curr = env->pCallStack[ env->iCallStackSize - 1 ];
+	env->iCallStackSize--;
+	co_swap( curr, last);
+}
+```
 

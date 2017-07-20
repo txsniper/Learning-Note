@@ -12,7 +12,7 @@ example_specific测试了协程私有变量(**类似于线程私有变量**)
 业务协程A和业务协程B之间的执行依赖于主协程的调度
 ### 3. 如何处理定时器和阻塞函数
 在协程的执行函数中，有时我们会sleep一段时间或者调用一些阻塞函数(比如IO函数，read/write)，如果我们不进行处理，那么会直接阻塞协程所在的线程，为了处理这种情况，我们需要对这些函数进行Hook，提供对应的非阻塞的函数。  
-IO函数实质上是对文件描述符的读写操作，sleep则是等待一段时间，然后超时。可同时等待多个文件描述符的读写操作，同时还包含超时，**epoll !!!**
+IO函数实质上是对文件描述符的读写操作，sleep则是等待一段时间，然后超时。可同时等待多个文件描述符的读写操作，同时还包含超时，**使用 epoll !!!**
 
 ## 整体流程
 ### 功能函数
@@ -35,7 +35,7 @@ int co_create( stCoRoutine_t **ppco,const stCoRoutineAttr_t *attr,pfn_co_routine
 }
 ```
 
-协程切换，有两种切换方式：
+协程切换，两种切换方式：
 1. 主动切换到某个指定的协程(主协程常用来主动切换到业务协程)
 2. 主动让出执行线程，业务协程执行完毕后会主动让出执行。
 ```
@@ -64,4 +64,27 @@ void co_yield_env( stCoRoutineEnv_t *env )
 	co_swap( curr, last);
 }
 ```
+对于每一个执行线程，有一个协程栈 pCallStack (不是协程执行函数栈)，栈中包含了当前加入到执行队列中的协程，这里与另外的协程库(libgo，百度的bthread)不同的是，libco的执行线程并不包含一个待执行的协程列表，这里只有执行co_resume切换到目标协程时才将协程加入到pCallStack。 **注意，我们在初始化线程的协程执行环境时，会将主协程添加到 pCallStack[0]的位置，也就是说，当pCallStack中所有业务协程执行完之后，将一直执行主协程**   
+libco中为了切换到目标协程，手动的设置了函数栈的返回地址：
 
+`coctx_make( &co->ctx,(coctx_pfn_t)CoRoutineFunc,co,0 )`  
+coctx_make配置了协程的执行上下文，主要是将CoRoutineFunc设置为栈返回函数，将co设置为参数。
+CoRoutineFunc就是每个协程执行的函数，
+```
+static int CoRoutineFunc( stCoRoutine_t *co,void * )
+{
+	// 执行协程任务
+	if( co->pfn )
+	{
+		co->pfn( co->arg );
+	}
+	co->cEnd = 1;
+
+	stCoRoutineEnv_t *env = co->env;
+
+	// 执行完毕，切换
+	co_yield_env( env );
+
+	return 0;
+}
+```

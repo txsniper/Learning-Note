@@ -66,7 +66,7 @@ void co_yield_env( stCoRoutineEnv_t *env )
 	co_swap( curr, last);
 }
 ```
-对于每一个执行线程，有一个协程栈 pCallStack (不是协程执行函数栈)，栈中包含了当前加入到执行队列中的协程，这里与另外的协程库(libgo，百度的bthread)不同的是，libco的执行线程并不包含一个待执行的协程列表，这里只有执行co_resume切换到目标协程时才将协程加入到pCallStack。 **注意，我们在初始化线程的协程执行环境时，会将主协程添加到 pCallStack[0]的位置，也就是说，当pCallStack中所有业务协程执行完之后，将一直执行主协程**   
+对于每一个执行线程，有一个协程栈 pCallStack (不是协程执行函数栈)，栈中包含了当前加入到执行队列中的协程，这里与另外的协程库(libgo，百度的bthread)不同的是，libco的执行线程并不包含一个待执行的协程列表，这里只有执行co_resume切换到目标协程时才将协程加入到pCallStack(所以所有example中都是利用co_create新建一个协程，然后马上执行co_resume切换到它)。 **注意，我们在初始化线程的协程执行环境时，会将主协程添加到 pCallStack[0]的位置，也就是说，当pCallStack中所有业务协程执行完之后，将一直执行主协程**   
 libco中为了切换到目标协程，手动的设置了函数栈的返回地址：
 
 `coctx_make( &co->ctx,(coctx_pfn_t)CoRoutineFunc,co,0 )`  
@@ -104,6 +104,7 @@ void co_swap(stCoRoutine_t* curr, stCoRoutine_t* pending_co)
 	char c;
 	curr->stack_sp= &c;
 
+	// 独立栈，不用设置
 	if (!pending_co->cIsShareStack)
 	{
 		env->pending_co = NULL;
@@ -111,8 +112,7 @@ void co_swap(stCoRoutine_t* curr, stCoRoutine_t* pending_co)
 	}
 	else 
 	{
-		// 共享栈，需要保存
-
+		// 共享栈，需要保存当前的栈内容
 		env->pending_co = pending_co;
 		//get last occupy co on the same stack mem
 		// 获取之前占有栈空间的协程
@@ -134,7 +134,7 @@ void co_swap(stCoRoutine_t* curr, stCoRoutine_t* pending_co)
 	// 最重要的函数：切换执行上下文
 	coctx_swap(&(curr->ctx),&(pending_co->ctx) );
 
-	// 切换回来(co_resume实现)
+	// 切换回来(co_resume实现)，恢复栈内容
 	//stack buffer may be overwrite, so get again;
 	stCoRoutineEnv_t* curr_env = co_get_curr_thread_env();
 	stCoRoutine_t* update_occupy_co =  curr_env->occupy_co;
@@ -150,3 +150,58 @@ void co_swap(stCoRoutine_t* curr, stCoRoutine_t* pending_co)
 	}
 }
 ```
+
+### example_specific执行流程
+首先创建10个协程，在每创建完一个协程时都立刻调用co_resume切换到新创建的协程
+
+```
+int main()
+{
+	stRoutineArgs_t args[10];
+	for (int i = 0; i < 10; i++)
+	{
+		args[i].routine_id = i;
+		co_create(&args[i].co, NULL, RoutineFunc, (void*)&args[i]);
+		co_resume(args[i].co);
+	}
+	co_eventloop(co_get_epoll_ct(), NULL, NULL);
+	return 0;
+}
+```
+
+协程执行的业务函数 RoutineFunc
+
+```
+void* RoutineFunc(void* args)
+{
+	co_enable_hook_sys();
+	stRoutineArgs_t* routine_args = (stRoutineArgs_t*)args;
+	__routine->idx = routine_args->routine_id;
+	while (true)
+	{
+		printf("%s:%d routine specific data idx %d\n", __func__, __LINE__, __routine->idx);
+		poll(NULL, 0, 1000);
+	}
+	return NULL;
+}
+```
+在业务函数循环中，不停的输出内容并睡眠1s，上面说了，为了不让poll阻塞当前线程，对poll进行了Hook，使用自己的函数代替系统poll
+
+```
+int poll(struct pollfd fds[], nfds_t nfds, int timeout)
+{
+
+	HOOK_SYS_FUNC( poll );
+
+	// 如果没启动hoook，则直接调用系统poll
+	if( !co_is_enable_sys_hook() )
+	{
+		return g_sys_poll_func( fds,nfds,timeout );
+	}
+
+	// 调用自己实现的poll
+	return co_poll_inner( co_get_epoll_ct(),fds,nfds,timeout, g_sys_poll_func);
+
+}
+```
+在 co_poll_inner函数中分了4步，前面三步将需要等待的文件描述符加入到epoll中，需要等待的超时加入到链表中，然后执行 co_yield_env 让出当前执行线程，当业务协程让出执行后，线程会执行主协程。

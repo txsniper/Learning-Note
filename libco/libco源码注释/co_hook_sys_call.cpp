@@ -578,11 +578,13 @@ int poll(struct pollfd fds[], nfds_t nfds, int timeout)
 
 	HOOK_SYS_FUNC( poll );
 
+	// å¦‚æœæ²¡å¯åŠ¨hoookï¼Œåˆ™ç›´æ¥è°ƒç”¨ç³»ç»Ÿpoll
 	if( !co_is_enable_sys_hook() )
 	{
 		return g_sys_poll_func( fds,nfds,timeout );
 	}
 
+	// è°ƒç”¨è‡ªå·±å®ç°çš„poll
 	return co_poll_inner( co_get_epoll_ct(),fds,nfds,timeout, g_sys_poll_func);
 
 }
@@ -955,7 +957,7 @@ struct hostent *co_gethostbyname(const char *name)
 #endif
 
 
-void co_enable_hook_sys() //Õâº¯Êı±ØĞëÔÚÕâÀï,·ñÔò±¾ÎÄ¼ş»á±»ºöÂÔ£¡£¡£¡
+void co_enable_hook_sys() //ï¿½âº¯ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½,ï¿½ï¿½ï¿½ï¿½ï¿½Ä¼ï¿½ï¿½á±»ï¿½ï¿½ï¿½Ô£ï¿½ï¿½ï¿½ï¿½ï¿½
 {
 	stCoRoutine_t *co = GetCurrThreadCo();
 	if( co )

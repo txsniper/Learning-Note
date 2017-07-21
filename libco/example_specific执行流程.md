@@ -17,7 +17,8 @@ IO函数实质上是对文件描述符的读写操作，sleep则是等待一段�
 ## 整体流程
 ### 功能函数
 
-新建协程，如果当前线程没有创建协程执行环境，则初始化协程执行环境，同时创建线程的主协程，**主协程充当调度者的角色**
+#### 新建协程
+如果当前线程没有创建协程执行环境，则初始化协程执行环境，同时创建线程的主协程，**主协程充当调度者的角色**
 ```
 // 新建协程
 int co_create( stCoRoutine_t **ppco,const stCoRoutineAttr_t *attr,pfn_co_routine_t pfn,void *arg )
@@ -35,7 +36,8 @@ int co_create( stCoRoutine_t **ppco,const stCoRoutineAttr_t *attr,pfn_co_routine
 }
 ```
 
-协程切换，两种切换方式：
+#### 协程切换
+两种切换方式：
 1. 主动切换到某个指定的协程(主协程常用来主动切换到业务协程)
 2. 主动让出执行线程，业务协程执行完毕后会主动让出执行。
 ```
@@ -86,5 +88,65 @@ static int CoRoutineFunc( stCoRoutine_t *co,void * )
 	co_yield_env( env );
 
 	return 0;
+}
+```
+
+#### 切换内部流程
+
+co_swap是流程切换的内部函数，**该函数以执行coctx_swap为界，coctx_swap之前的代码是当前协程本次执行，coctx_swap之后的代码则是在执行了pending_co之后切换回当前协程执行。**
+```
+// 切换协程
+void co_swap(stCoRoutine_t* curr, stCoRoutine_t* pending_co)
+{
+ 	stCoRoutineEnv_t* env = co_get_curr_thread_env();
+
+	//get curr stack sp
+	char c;
+	curr->stack_sp= &c;
+
+	if (!pending_co->cIsShareStack)
+	{
+		env->pending_co = NULL;
+		env->occupy_co = NULL;
+	}
+	else 
+	{
+		// 共享栈，需要保存
+
+		env->pending_co = pending_co;
+		//get last occupy co on the same stack mem
+		// 获取之前占有栈空间的协程
+		stCoRoutine_t* occupy_co = pending_co->stack_mem->occupy_co;
+		//set pending co to occupy thest stack mem;
+		pending_co->stack_mem->occupy_co = pending_co;
+
+		// 保存之前占用栈空间的协程
+		env->occupy_co = occupy_co;
+
+		// 将之前占用栈空间的协程栈数据保存下来
+		if (occupy_co && occupy_co != pending_co)
+		{
+			save_stack_buffer(occupy_co);
+		}
+	}
+
+	//swap context
+	// 最重要的函数：切换执行上下文
+	coctx_swap(&(curr->ctx),&(pending_co->ctx) );
+
+	// 切换回来(co_resume实现)
+	//stack buffer may be overwrite, so get again;
+	stCoRoutineEnv_t* curr_env = co_get_curr_thread_env();
+	stCoRoutine_t* update_occupy_co =  curr_env->occupy_co;
+	stCoRoutine_t* update_pending_co = curr_env->pending_co;
+	
+	if (update_occupy_co && update_pending_co && update_occupy_co != update_pending_co)
+	{
+		//resume stack buffer
+		if (update_pending_co->save_buffer && update_pending_co->save_size > 0)
+		{
+			memcpy(update_pending_co->stack_sp, update_pending_co->save_buffer, update_pending_co->save_size);
+		}
+	}
 }
 ```

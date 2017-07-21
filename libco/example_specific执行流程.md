@@ -59,7 +59,7 @@ void co_resume( stCoRoutine_t *co )
 
 void co_yield_env( stCoRoutineEnv_t *env )
 {
-	// 从pCallStack中取出下一个执行的协程，进行切换
+	// 从pCallStack中取出上一个执行的协程，进行切换
 	stCoRoutine_t *last = env->pCallStack[ env->iCallStackSize - 2 ];
 	stCoRoutine_t *curr = env->pCallStack[ env->iCallStackSize - 1 ];
 	env->iCallStackSize--;
@@ -205,3 +205,63 @@ int poll(struct pollfd fds[], nfds_t nfds, int timeout)
 }
 ```
 在 co_poll_inner函数中分了4步，前面三步将需要等待的文件描述符加入到epoll中，需要等待的超时加入到链表中，然后执行 co_yield_env 让出当前执行线程，当业务协程让出执行后，线程会执行主协程。
+
+```
+int co_poll_inner( stCoEpoll_t *ctx,struct pollfd fds[], nfds_t nfds, int timeout, poll_pfn_t pollfunc)
+{
+	
+	if( timeout > stTimeoutItem_t::eMaxTimeout )
+	{
+		timeout = stTimeoutItem_t::eMaxTimeout;
+	}
+	int epfd = ctx->iEpollFd;
+	// 获取当前正在执行的协程
+	stCoRoutine_t* self = co_self();
+
+	//1.struct change
+	......
+	
+	//2. add epoll
+	for(nfds_t i=0;i<nfds;i++)
+	{
+		arg.pPollItems[i].pSelf = arg.fds + i;
+		arg.pPollItems[i].pPoll = &arg;
+
+		arg.pPollItems[i].pfnPrepare = OnPollPreparePfn;
+		struct epoll_event &ev = arg.pPollItems[i].stEvent;
+
+		if( fds[i].fd > -1 )
+		{
+			ev.data.ptr = arg.pPollItems + i;
+			ev.events = PollEvent2Epoll( fds[i].events );
+
+			int ret = co_epoll_ctl( epfd,EPOLL_CTL_ADD, fds[i].fd, &ev );
+			......
+		}
+		//if fail,the timeout would work
+	}
+
+	//3.add timeout
+
+	unsigned long long now = GetTickMS();
+	arg.ullExpireTime = now + timeout;
+	int ret = AddTimeout( ctx->pTimeout,&arg,now );
+	......
+
+	// 准备工作完成后，主动让出执行线程
+	co_yield_env( co_get_curr_thread_env() );
+
+	// 当再次切换回来的时候，继续执行
+	RemoveFromLink<stTimeoutItem_t,stTimeoutItemLink_t>( &arg );
+	for(nfds_t i = 0;i < nfds;i++)
+	{
+		int fd = fds[i].fd;
+		if( fd > -1 )
+		{
+			co_epoll_ctl( epfd,EPOLL_CTL_DEL,fd,&arg.pPollItems[i].stEvent );
+		}
+		fds[i].revents = arg.fds[i].revents;
+	}
+	......
+}
+```

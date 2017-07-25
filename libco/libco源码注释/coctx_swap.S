@@ -54,14 +54,14 @@ coctx_swap:
 	ret
 
 #elif defined(__x86_64__)
-	leaq 8(%rsp),%rax
-	leaq 112(%rdi),%rsp
+	leaq 8(%rsp),%rax		// esp + 0x8 ----> rax
+	leaq 112(%rdi),%rsp 	// rdi(arg1) + 0x70 ---> rsp; coctx_t结构中的regs 
 	pushq %rax
 	pushq %rbx
 	pushq %rcx
 	pushq %rdx
 
-	pushq -8(%rax) //ret func addr
+	pushq -8(%rax) //ret func addr coctx_swap函数的返回地址，coctx_swap由co_swap调用，因此这里的返回地址就是coctx_swap调用的下一条指令的地址
 
 	pushq %rsi
 	pushq %rdi

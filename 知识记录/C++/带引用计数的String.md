@@ -128,7 +128,6 @@ ObjectString<T>& operator=(const ObjectString<T>& string)
 }
 
 // move assignment operator
-
 ObjectString<T>& operator=(ObjectString<T>&& string)
 {       
     if(this!=&string)

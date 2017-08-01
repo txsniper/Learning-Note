@@ -364,7 +364,7 @@ struct stTimeout_t
 stTimeout_t *AllocTimeout( int iSize )
 {
 	stTimeout_t *lp = (stTimeout_t*)calloc( 1,sizeof(stTimeout_t) );	
-
+	// 分配item列表
 	lp->iItemSize = iSize;
 	lp->pItems = (stTimeoutItemLink_t*)calloc( 1,sizeof(stTimeoutItemLink_t) * lp->iItemSize );
 
@@ -392,6 +392,8 @@ int AddTimeout( stTimeout_t *apTimeout,stTimeoutItem_t *apItem ,unsigned long lo
 
 		return __LINE__;
 	}
+
+	// 如果超时时间小于当前时间，则直接返回失败
 	if( apItem->ullExpireTime < allNow )
 	{
 		co_log_err("CO_ERR: AddTimeout line %d apItem->ullExpireTime %llu allNow %llu apTimeout->ullStart %llu",
@@ -400,7 +402,9 @@ int AddTimeout( stTimeout_t *apTimeout,stTimeoutItem_t *apItem ,unsigned long lo
 		return __LINE__;
 	}
 	int diff = apItem->ullExpireTime - apTimeout->ullStart;
-
+	// 如果超时的时间间隔大于apTimeout的item数量，则返回失败，根据上文，默认item数量
+	// 是 60000，由于diff单位是毫秒，因此这里看最大超时时间间隔是60s，
+	// 但实际上 stTimeoutItem_t中规定的最大超时时间为40s
 	if( diff >= apTimeout->iItemSize )
 	{
 		co_log_err("CO_ERR: AddTimeout line %d diff %d",
@@ -688,7 +692,10 @@ struct stPoll_t : public stTimeoutItem_t
 };
 struct stPollItem_t : public stTimeoutItem_t
 {
+	// 指向对应的 stPoll_t->fds[i]
 	struct pollfd *pSelf;
+
+	// 指向所属的 stPoll_t
 	stPoll_t *pPoll;
 
 	struct epoll_event stEvent;
@@ -919,6 +926,7 @@ int co_poll_inner( stCoEpoll_t *ctx,struct pollfd fds[], nfds_t nfds, int timeou
 	arg.nfds = nfds;
 
 	stPollItem_t arr[2];
+	// 非共享栈 并且 数量较小，就直接使用栈空间
 	if( nfds < sizeof(arr) / sizeof(arr[0]) && !self->cIsShareStack)
 	{
 		arg.pPollItems = arr;
@@ -929,6 +937,7 @@ int co_poll_inner( stCoEpoll_t *ctx,struct pollfd fds[], nfds_t nfds, int timeou
 	}
 	memset( arg.pPollItems,0,nfds * sizeof(stPollItem_t) );
 
+	// 设定执行Poll事件的函数(执行协程就是当前主协程)
 	arg.pfnProcess = OnPollProcessEvent;
 	arg.pArg = GetCurrCo( co_get_curr_thread_env() );
 	
@@ -945,9 +954,13 @@ int co_poll_inner( stCoEpoll_t *ctx,struct pollfd fds[], nfds_t nfds, int timeou
 		if( fds[i].fd > -1 )
 		{
 			ev.data.ptr = arg.pPollItems + i;
+
+			// 将Poll事件转为Epoll事件
 			ev.events = PollEvent2Epoll( fds[i].events );
 
 			int ret = co_epoll_ctl( epfd,EPOLL_CTL_ADD, fds[i].fd, &ev );
+
+			// 如果 fd对应的文件不支持epoll(例如普通文件或者目录)，则使用原始的poll函数
 			if (ret < 0 && errno == EPERM && nfds == 1 && pollfunc != NULL)
 			{
 				if( arg.pPollItems != arr )

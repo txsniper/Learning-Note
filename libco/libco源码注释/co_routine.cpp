@@ -154,10 +154,13 @@ static pid_t GetPid()
 template <class T,class TLink>
 void RemoveFromLink(T *ap)
 {
+	// step1 : 找到item对应的链表
 	TLink *lst = ap->pLink;
 	if(!lst) return ;
 	assert( lst->head && lst->tail );
 
+	// step2 : 从双向链表中移除，考虑ap作为链表头尾的情况
+	// 需要特殊处理
 	if( ap == lst->head )
 	{
 		lst->head = ap->pNext;
@@ -191,6 +194,7 @@ void RemoveFromLink(T *ap)
 	ap->pLink = NULL;
 }
 
+// 添加到链表的结尾
 template <class TNode,class TLink>
 void inline AddTail(TLink*apLink,TNode *ap)
 {
@@ -238,6 +242,7 @@ void inline PopHead( TLink*apLink )
 	}
 }
 
+// 合并两个链表
 template <class TNode,class TLink>
 void inline Join( TLink*apLink,TLink *apOther )
 {
@@ -335,11 +340,11 @@ struct stTimeoutItem_t
 	{
 		eMaxTimeout = 40 * 1000 //40s
 	};
-	stTimeoutItem_t *pPrev;
-	stTimeoutItem_t *pNext;
-	stTimeoutItemLink_t *pLink;
+	stTimeoutItem_t *pPrev;				 
+	stTimeoutItem_t *pNext;				
+	stTimeoutItemLink_t *pLink;			// 指向Item对应的链表
 
-	unsigned long long ullExpireTime;
+	unsigned long long ullExpireTime;	// 超时时间
 
 	OnPreparePfn_t pfnPrepare;
 	OnProcessPfn_t pfnProcess;
@@ -347,9 +352,11 @@ struct stTimeoutItem_t
 	void *pArg; // routine 
 	bool bTimeout;
 };
+
+// 侵入式双向链表
 struct stTimeoutItemLink_t
 {
-	stTimeoutItem_t *head;
+	stTimeoutItem_t *head;	
 	stTimeoutItem_t *tail;
 
 };
@@ -364,7 +371,7 @@ struct stTimeout_t
 stTimeout_t *AllocTimeout( int iSize )
 {
 	stTimeout_t *lp = (stTimeout_t*)calloc( 1,sizeof(stTimeout_t) );	
-	// 分配item列表
+	// 分配ItemLink列表
 	lp->iItemSize = iSize;
 	lp->pItems = (stTimeoutItemLink_t*)calloc( 1,sizeof(stTimeoutItemLink_t) * lp->iItemSize );
 

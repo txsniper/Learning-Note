@@ -18,7 +18,22 @@ logic主流程通过InitRouter提供了访问Router节点的接口
     routerServiceMGet           = "RouterRPC.MGet"
     routerServiceGetAll         = "RouterRPC.GetAll"
 ```
-接口中"RouterRPC.Put"和"RouterRPC.Del"用于新连接的处理和连接的断开，其它的接口则主要完成业务逻辑。
+接口中"RouterRPC.Put"和"RouterRPC.Del"用于新连接的处理和连接的断开，而其它的接口则主要完成业务逻辑。
+新连接到达时会为它分配uid和roomId，这一步就是在logic的Auth中完成的，当前提供的默认Auth只是提供了一个简单的分配方案，可以根据具体的需求扩展
+```
+func (a *DefaultAuther) Auth(token string) (userId int64, roomId int32) {
+    var err error
+    if userId, err = strconv.ParseInt(token, 10, 64); err != nil
+    {
+        userId = 0
+        roomId = define.NoRoom
+    } else {
+        roomId = 1 // only for debug
+    }
+    return
+}
+```
+
 
 ### 提供向用户Push消息的接口
 goim使用kafka向用户push消息，logic模块通过两个步骤提供了push消息的功能：

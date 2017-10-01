@@ -77,7 +77,7 @@ struct MutexInternal {
 };
 
 ```
-与此同时，还定义了两个常量用来代表加锁状态和锁冲突状态
+与此同时，还定义了两个常量用来代表加锁状态和锁冲突状态，**如果出现锁冲突状态，说明有bthread等待在锁上，在解锁时需要唤醒等待的bthread**
 ```
 const MutexInternal MUTEX_CONTENDED_RAW = {{1},{1},0};
 const MutexInternal MUTEX_LOCKED_RAW = {{1},{0},0};
@@ -180,6 +180,39 @@ int bthread_mutex_timedlock(bthread_mutex_t* __restrict m,
         bthread::submit_contention(csite, end_ns);
     }
     return rc;
+}
+```
+
+## 解锁 (unlock)
+解锁，根据锁的状态确定是否需要唤醒等待的bthread
+```
+int bthread_mutex_unlock(bthread_mutex_t* m) __THROW {
+    butil::atomic<unsigned>* whole = (butil::atomic<unsigned>*)m->butex;
+    bthread_contention_site_t saved_csite = {0, 0};
+    if (bthread::is_contention_site_valid(m->csite)) {
+        saved_csite = m->csite;
+        bthread::make_contention_site_invalid(&m->csite);
+    }
+    // step1 : 解除加锁状态, 获取解锁前的状态
+    const unsigned prev = whole->exchange(0, butil::memory_order_release);
+    // CAUTION: the mutex may be destroyed, check comments before butex_create
+
+    // 如果之前的状态只是加锁，说明没有其他bthread等待，直接返回
+    if (prev == BTHREAD_MUTEX_LOCKED) {
+        return 0;
+    }
+    // Wakeup one waiter
+    // step2 : 如果之前的状态是 BTHREAD_MUTEX_CONTENDED , 则唤醒一个等待的bthread
+    if (!bthread::is_contention_site_valid(saved_csite)) {
+        bthread::butex_wake(whole);
+        return 0;
+    }
+    const int64_t unlock_start_ns = butil::cpuwide_time_ns();
+    bthread::butex_wake(whole);
+    const int64_t unlock_end_ns = butil::cpuwide_time_ns();
+    saved_csite.duration_ns += unlock_end_ns - unlock_start_ns;
+    bthread::submit_contention(saved_csite, unlock_end_ns);
+    return 0;
 }
 ```
 

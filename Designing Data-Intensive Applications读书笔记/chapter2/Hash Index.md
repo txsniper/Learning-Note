@@ -47,3 +47,20 @@ hash索引的整体思路是基于log的，写入数据时追加到log文件尾�
 - hash索引无法支持范围查找，比如查找kitty0000 到 kitty9999 之间的所有数据
 
 ### 二. SSTables和LSM-Trees
+上面的方案中segment文件由key-value序列组成，没有顺序，在SSTables(Sorted String Table)中，key-value序列根据key排序，相比起之前的方案，优势在于：  
+1. 融合segment的过程简单高效，即使segment文件比可用内存大。整个过程就像使用 mergesort算法(归并排序)，在排序过程中，当多个segment包含相同的key时，保留最近时间的，丢掉旧的数据
+![](images/4.jpg)
+  
+2. 在查找某个key时，**不再需要在内存中保留所有的key对应的偏移**
+![](images/5.jpg)
+假设要查找handiwork，虽然索引中没有handiwork对应的value，但有handbag和handsome的数据的偏移，并且我们知道**handiwork的顺序在handbag和handsome之间。因此只需要跳到handbag的偏移然后不停向后查找，直到找到handiwork(或者不存在找不到)**。这种方式节省了索引占用的内存
+
+3. 由于read操作需要扫描请求范围内多个key-value对，所以可以将这些记录分组到一个block中，压缩写磁盘，内存中的索引记录的不再是某一个key的数据偏移，而是每一个block的开始位置
+
+#### 构建和维护SSTables
+存储引擎工作流程如下：
+- 当有写入操作时，将数据写入到内存中的平衡树结构中，这种内存中的树叫做 **memtable**
+- 当 memetable 的大小超过一定阈值，将它作为SSTable文件写入到磁盘上。由于memtable中的key-value数据是有序的，因此写入过程高效。新的SSTable文件成为了数据库最新的segment。在SSTable写入磁盘的过程中，创建一个新的memtable
+- 查找数据时，先查找当前的memtable，然后查找磁盘上最近的segment，以此类推
+- 随着时间的推移，后台线程执行merge和compaction操作合并segment文件
+- 当database崩溃时，会丢失最近的写入数据(它们保存在内存中的memtable中)。为了防止这种情况，在磁盘上使用另外的一个log文件，每次的写操作先append到这个log文件中。这个文件只是用于崩溃后恢复memtalbe，每次memtable写为SSTable时，可以删除对应的log文件

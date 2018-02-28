@@ -52,7 +52,7 @@ hash索引的整体思路是基于log的，写入数据时追加到log文件尾�
 ![](images/4.jpg)
   
 2. 在查找某个key时，**不再需要在内存中保留所有的key对应的偏移**
-![](images/5.jpg)
+![](images/5.jpg)  
 假设要查找handiwork，虽然索引中没有handiwork对应的value，但有handbag和handsome的数据的偏移，并且我们知道**handiwork的顺序在handbag和handsome之间。因此只需要跳到handbag的偏移然后不停向后查找，直到找到handiwork(或者不存在找不到)**。这种方式节省了索引占用的内存
 
 3. 由于read操作需要扫描请求范围内多个key-value对，所以可以将这些记录分组到一个block中，压缩写磁盘，内存中的索引记录的不再是某一个key的数据偏移，而是每一个block的开始位置

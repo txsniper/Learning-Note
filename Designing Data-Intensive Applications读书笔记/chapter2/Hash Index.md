@@ -63,4 +63,12 @@ hash索引的整体思路是基于log的，写入数据时追加到log文件尾�
 - 当 memetable 的大小超过一定阈值，将它作为SSTable文件写入到磁盘上。由于memtable中的key-value数据是有序的，因此写入过程高效。新的SSTable文件成为了数据库最新的segment。在SSTable写入磁盘的过程中，创建一个新的memtable
 - 查找数据时，先查找当前的memtable，然后查找磁盘上最近的segment，以此类推
 - 随着时间的推移，后台线程执行merge和compaction操作合并segment文件
-- 当database崩溃时，会丢失最近的写入数据(它们保存在内存中的memtable中)。为了防止这种情况，在磁盘上使用另外的一个log文件，每次的写操作先append到这个log文件中。这个文件只是用于崩溃后恢复memtalbe，每次memtable写为SSTable时，可以删除对应的log文件
+- 当database崩溃时，会丢失最近的写入数据(它们保存在内存中的memtable中)。为了防止这种情况，在磁盘上使用另外的一个log文件，每次的写操作记录先append到这个log文件中。这个文件只是用于崩溃后恢复memtalbe，每次memtable写为SSTable时，可以删除它
+
+#### Making an LSM-tree out of SSTables
+这里讨论的算法对于LevelDB和RockesDB是关键的。基于对有序文件进行merge和compaction的存储引擎称为LSM存储引擎  
+Lucene (被用在Elasticsearch 和 Solr) 使用相似的方式来存储词典(term dictionary)
+
+#### 性能优化
+LSM-tree算法在查找一个不存在的key时会很慢，因为你必须先查找memtable，然后再查找所有的segment文件(从磁盘上读取)。为了加快查询过程，存储引擎经常使用 **Bloom filter** (布隆过滤器:有不一定有，无一定无)  
+有多种方式决定对SSTable进行compaction和merge操作的时机和顺序，最常见的方式是 size-tiered 和 leveled compaction (大小分层，分层compaction)。LevelDB和RocksDB使用分层compaction，HBase使用size-tiered，Cassandra这两种方式都支持。在size-tiered compaction中，新的更小的SSTables逐步合并到旧的更大的SSTable中；而在leveled compaction中，key的范围划分到更小的SSTable中，旧的数据移动到分开的level中，这样就可以使compaction工作增量进行并减少需要的磁盘空间

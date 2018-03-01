@@ -72,3 +72,4 @@ Lucene (被用在Elasticsearch 和 Solr) 使用相似的方式来存储词典(te
 #### 性能优化
 LSM-tree算法在查找一个不存在的key时会很慢，因为你必须先查找memtable，然后再查找所有的segment文件(从磁盘上读取)。为了加快查询过程，存储引擎经常使用 **Bloom filter** (布隆过滤器:有不一定有，无一定无)  
 有多种方式决定对SSTable进行compaction和merge操作的时机和顺序，最常见的方式是 size-tiered 和 leveled compaction (大小分层，分层compaction)。LevelDB和RocksDB使用分层compaction，HBase使用size-tiered，Cassandra这两种方式都支持。在size-tiered compaction中，新的更小的SSTables逐步合并到旧的更大的SSTable中；而在leveled compaction中，key的范围划分到更小的SSTable中，旧的数据移动到分开的level中，这样就可以使compaction工作增量进行并减少需要的磁盘空间
+

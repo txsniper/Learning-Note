@@ -9,6 +9,14 @@ import numpy as np
 import pandas as pd
 from scipy import sparse
 
+from sklearn.metrics import mean_squared_error
+from sklearn.metrics import mean_absolute_error
+from sklearn.model_selection import cross_val_score
+from sklearn.tree import DecisionTreeRegressor
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.svm import SVR
+
+
 
 class CategoricalEncoder(BaseEstimator, TransformerMixin):
     def __init__(self, encoding='onehot', categories='auto', dtype=np.float64,
@@ -235,6 +243,97 @@ class Housing(object):
         set_cat_reshaped = set_cat.values.reshape(-1, 1)
         set_cat_1hot = cat_encoder.fit_transform(set_cat_reshaped)
 
+    def display_error(self, scores, name):
+            print(name + "Scores:", scores)
+            print(name + "Mean:", scores.mean())
+            print(name + "Standard deviation:", scores.std())
+
+    def lin_reg_prediction(self, housing_prepared, housing_labels):
+        lin_reg = LinearRegression()
+        lin_reg.fit(housing_prepared, housing_labels)
+        housing_predictions = lin_reg.predict(housing_prepared)
+        lin_mse = mean_squared_error(housing_labels, housing_predictions)
+        lin_rmse = np.sqrt(lin_mse)
+        print("lin_reg rmse: " + str(lin_rmse))
+        lin_mae = mean_absolute_error(housing_labels, housing_predictions)
+        print("lin_reg mae: " + str(lin_mae))
+        lin_scores = cross_val_score(lin_reg, housing_prepared, housing_labels,
+            scoring="neg_mean_squared_error", cv=10)
+        lin_rmse_scores = np.sqrt(-lin_scores)
+        self.display_error(lin_rmse_scores, "lin_reg")
+
+    def tree_reg_prediction(self, housing_prepared, housing_labels):
+        tree_reg = DecisionTreeRegressor(random_state=42)
+        tree_reg.fit(housing_prepared, housing_labels)
+        housing_predictions = tree_reg.predict(housing_prepared)
+        tree_mse = mean_squared_error(housing_labels, housing_predictions)
+        tree_rmse = np.sqrt(tree_mse)
+        print("tree_reg rmse: " + str(tree_rmse))
+        scores = cross_val_score(tree_reg, housing_prepared, housing_labels,
+            scoring="neg_mean_squared_error", cv=10)
+        tree_rmse_scores = np.sqrt(-scores)
+        self.display_error(tree_rmse_scores, "tree_reg")
+
+    def forest_reg_prediction(self, housing_prepared, housing_labels):
+        forest_reg = RandomForestRegressor(random_state=42)
+        forest_reg.fit(housing_prepared, housing_labels)
+        housing_predictions = forest_reg.predict(housing_prepared)
+        forest_mse = mean_squared_error(housing_labels, housing_predictions)
+        forest_rmse = np.sqrt(forest_mse)
+        print("forest_rmse: "+ str(forest_rmse))
+        forest_scores = cross_val_score(forest_reg, housing_prepared, housing_labels,
+            scoring="neg_mean_squared_error", cv=10)
+        forest_rmse_scores = np.sqrt(-forest_scores)
+        self.display_error(forest_rmse_scores, "forest_rmse_scores")
+
+    def svr_reg_prediction(self, housing_prepared, housing_labels):
+        svm_reg = SVR(kernel="linear")
+        svm_reg.fit(housing_prepared, housing_labels)
+        housing_predictions = svm_reg.predict(housing_prepared)
+        svm_mse = mean_squared_error(housing_labels, housing_predictions)
+        svm_rmse = np.sqrt(svm_mse)
+        print("svm_rmse: " + str(svm_rmse))
+
+    def grid_search_forest_reg(self, housing_prepared, housing_labels):
+        from sklearn.model_selection import GridSearchCV
+        param_grid = [
+            # try 12 (3×4) combinations of hyperparameters
+            {'n_estimators': [3, 10, 30], 'max_features': [2, 4, 6, 8]},
+            # then try 6 (2×3) combinations with bootstrap set as False
+            {'bootstrap': [False], 'n_estimators': [3, 10], 'max_features': [2, 3, 4]},
+        ]
+        forest_reg = RandomForestRegressor(random_state=42)
+        grid_search = GridSearchCV(forest_reg, param_grid, cv=5,
+            scoring='neg_mean_squared_error', return_train_score=True)
+        grid_search.fit(housing_prepared, housing_labels)
+        print(grid_search.best_estimator_)
+        print(grid_search.best_params_)
+        cvres = grid_search.cv_results_
+        for mean_score, params in zip(cvres["mean_test_score"], cvres["params"]):
+            print(np.sqrt(-mean_score), params)
+
+        feature_importances = grid_search.best_estimator_.feature_importances_
+        print(feature_importances)
+
+    def random_search_forest_reg(self, housing_prepared, housing_labels):
+        from sklearn.model_selection import RandomizedSearchCV
+        from scipy.stats import randint
+
+        param_distribs = {
+            'n_estimators': randint(low=1, high=200),
+            'max_features': randint(low=1, high=8),
+        }
+        forest_reg = RandomForestRegressor(random_state=42)
+        rnd_search = RandomizedSearchCV(forest_reg, param_distributions=param_distribs,
+                        n_iter=10, cv=5, scoring='neg_mean_squared_error', random_state=42)
+        rnd_search.fit(housing_prepared, housing_labels)
+        cvres = rnd_search.cv_results_
+        for mean_score, params in zip(cvres["mean_test_score"], cvres["params"]):
+            print(np.sqrt(-mean_score), params)
+
+        feature_importances = rnd_search.best_estimator_.feature_importances_
+        print(feature_importances)
+
     def run(self):
         self.split_train_test(use_level=True)
 
@@ -272,64 +371,19 @@ class Housing(object):
         ])
         print(X.head())
         housing_prepared = full_pipeline.fit_transform(X)
-        lin_reg = LinearRegression()
-        lin_reg.fit(housing_prepared, x_labels)
-        housing_predictions = lin_reg.predict(housing_prepared)
-        from sklearn.metrics import mean_squared_error
-        lin_mse = mean_squared_error(x_labels, housing_predictions)
-        lin_rmse = np.sqrt(lin_mse)
-        print("lin_reg rmse: " + str(lin_rmse))
-        from sklearn.metrics import mean_absolute_error
-        lin_mae = mean_absolute_error(x_labels, housing_predictions)
-        print("lin_reg mae: " + str(lin_mae))
-        from sklearn.tree import DecisionTreeRegressor
-        tree_reg = DecisionTreeRegressor(random_state=42)
-        tree_reg.fit(housing_prepared, x_labels)
-        housing_predictions = tree_reg.predict(housing_prepared)
-        tree_mse = mean_squared_error(x_labels, housing_predictions)
-        tree_rmse = np.sqrt(tree_mse)
-        print("tree_reg rmse: " + str(tree_rmse))
 
-
-        def display_error(scores, name):
-            print(name + "Scores:", scores)
-            print(name + "Mean:", scores.mean())
-            print(name + "Standard deviation:", scores.std())
-
-        from sklearn.model_selection import cross_val_score
-        scores = cross_val_score(tree_reg, housing_prepared, x_labels,
-            scoring="neg_mean_squared_error", cv=10)
-        tree_rmse_scores = np.sqrt(-scores)
-        display_error(tree_rmse_scores, "tree_reg")
-
-        lin_scores = cross_val_score(lin_reg, housing_prepared, x_labels,
-            scoring="neg_mean_squared_error", cv=10)
-        lin_rmse_scores = np.sqrt(-lin_scores)
-        display_error(lin_rmse_scores, "lin_reg")
-
-        from sklearn.ensemble import RandomForestRegressor
-        forest_reg = RandomForestRegressor(random_state=42)
-        forest_reg.fit(housing_prepared, x_labels)
-        housing_predictions = forest_reg.predict(housing_prepared)
-        forest_mse = mean_squared_error(x_labels, housing_predictions)
-        forest_rmse = np.sqrt(forest_mse)
-        print("forest_rmse: "+ str(forest_rmse))
-        forest_scores = cross_val_score(forest_reg, housing_prepared, x_labels,
-            scoring="neg_mean_squared_error", cv=10)
-        forest_rmse_scores = np.sqrt(-forest_scores)
-        display_error(forest_rmse_scores, "forest_rmse_scores")
-
+        self.lin_reg_prediction(housing_prepared, x_labels)
+        self.tree_reg_prediction(housing_prepared, x_labels)
+        self.forest_reg_prediction(housing_prepared, x_labels)
+    
+        '''
         scores = cross_val_score(lin_reg, housing_prepared, x_labels, scoring="neg_mean_squared_error", cv=10)
         pd.Series(np.sqrt(-scores)).describe()
-
+        '''
+        self.grid_search_forest_reg(housing_prepared, x_labels)
+        self.random_search_forest_reg(housing_prepared, x_labels)
         
 if __name__ == "__main__":
     csv_data_path = "./datasets/housing/housing.csv"
     housing_obj = Housing(csv_data_path)
     housing_obj.run()
-
-
-
-
-
-

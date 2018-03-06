@@ -294,7 +294,7 @@ class Housing(object):
         svm_rmse = np.sqrt(svm_mse)
         print("svm_rmse: " + str(svm_rmse))
 
-    def grid_search_forest_reg(self, housing_prepared, housing_labels):
+    def grid_search_forest_reg(self, housing_prepared, housing_labels, attributes):
         from sklearn.model_selection import GridSearchCV
         param_grid = [
             # try 12 (3×4) combinations of hyperparameters
@@ -307,15 +307,18 @@ class Housing(object):
             scoring='neg_mean_squared_error', return_train_score=True)
         grid_search.fit(housing_prepared, housing_labels)
         print(grid_search.best_estimator_)
-        print(grid_search.best_params_)
+        #print(grid_search.best_params_)
         cvres = grid_search.cv_results_
         for mean_score, params in zip(cvres["mean_test_score"], cvres["params"]):
             print(np.sqrt(-mean_score), params)
 
         feature_importances = grid_search.best_estimator_.feature_importances_
+        print("feature_importances-------------------------")
         print(feature_importances)
+        ret = sorted(zip(feature_importances, attributes), reverse=True)
+        print(ret)
 
-    def random_search_forest_reg(self, housing_prepared, housing_labels):
+    def random_search_forest_reg(self, housing_prepared, housing_labels, attributes):
         from sklearn.model_selection import RandomizedSearchCV
         from scipy.stats import randint
 
@@ -332,7 +335,10 @@ class Housing(object):
             print(np.sqrt(-mean_score), params)
 
         feature_importances = rnd_search.best_estimator_.feature_importances_
+        print("feature_importances-------------------------")
         print(feature_importances)
+        ret = sorted(zip(feature_importances, attributes), reverse=True)
+        print(ret)
 
     def run(self):
         self.split_train_test(use_level=True)
@@ -380,8 +386,12 @@ class Housing(object):
         scores = cross_val_score(lin_reg, housing_prepared, x_labels, scoring="neg_mean_squared_error", cv=10)
         pd.Series(np.sqrt(-scores)).describe()
         '''
-        self.grid_search_forest_reg(housing_prepared, x_labels)
-        self.random_search_forest_reg(housing_prepared, x_labels)
+        extra_attribs = ["rooms_per_household", "population_per_household", "bedrooms_per_room"]
+        cat_encoder = cat_pipeline.named_steps["cat_encoder"]
+        cat_one_hot_attribs = list(cat_encoder.categories_[0])
+        attributes = num_attribs + extra_attribs + cat_one_hot_attribs
+        #self.grid_search_forest_reg(housing_prepared, x_labels, attributes)
+        self.random_search_forest_reg(housing_prepared, x_labels, attributes)
         
 if __name__ == "__main__":
     csv_data_path = "./datasets/housing/housing.csv"

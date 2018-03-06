@@ -4,6 +4,7 @@ from sklearn.model_selection import StratifiedShuffleSplit
 from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.pipeline import Pipeline, FeatureUnion
 from sklearn.utils import check_array
+from sklearn.linear_model import LinearRegression
 import numpy as np
 import pandas as pd
 from scipy import sparse
@@ -134,9 +135,11 @@ class CombinedAttributesAdder(BaseEstimator, TransformerMixin):
         population_per_household = X[:, population_ix] / X[:, household_ix]
         if self.add_bedrooms_per_room:
             bedrooms_per_room = X[:, population_ix] / X[:, household_ix]
-            return np.c_[X, rooms_per_household, population_per_household, bedrooms_per_room]
+            ret = np.c_[X, rooms_per_household, population_per_household, bedrooms_per_room]
+            return ret
         else:
-            return np.c_[X, rooms_per_household, population_per_household]
+            ret = np.c_[X, rooms_per_household, population_per_household]
+            return ret
 
 
 class DataFrameSelector(BaseEstimator, TransformerMixin):
@@ -147,7 +150,8 @@ class DataFrameSelector(BaseEstimator, TransformerMixin):
         return self
 
     def transform(self, X):
-        return X[self.attribute_names].values
+        ret = X[self.attribute_names].values
+        return ret
 
 
 
@@ -186,11 +190,13 @@ class Housing(object):
             self.split_train_test_level(feature_name, test_ratio)
 
     def split_train_test(self, use_level):
+        if self.data is None:
+            self.load_data()
         test_ratio = 0.2
         if use_level is True:
              # 分层抽样, 构建基准特征
             feature_name = 'income_cat'
-            self.data[feature_name] = np.ceil(self.data['media_income'] / 1.5)
+            self.data[feature_name] = np.ceil(self.data['median_income'] / 1.5)
             self.data[feature_name].where(self.data[feature_name] < 5, 5.0, inplace=True)
             self.split_train_test_internal('level', feature_name, test_ratio)
             for set_ in (self.test_set, self.train_set):
@@ -236,14 +242,16 @@ class Housing(object):
         X = self.train_set.drop(y_feature_name, axis=1)
         x_labels = self.train_set[y_feature_name].copy()
 
+        '''
         attr_addr = CombinedAttributesAdder(add_bedrooms_per_room=False)
         housing_extra_attribs = attr_addr.transform(self.data.values)
         housing_extra_attribs = pd.DataFrame(housing_extra_attribs, columns=list(self.data.columns) + ["rooms_per_household", "population_per_household"])
-
+        '''
         cat_feature_name = 'ocean_proximity'
-        housing_num = self.train_set.drop(cat_feature_name, axis=1)
+        housing_num = X.drop(cat_feature_name, axis=1)
 
         num_attribs = list(housing_num)
+        print(num_attribs)
         cat_attribs = [cat_feature_name]
 
         num_pipeline = Pipeline([
@@ -262,8 +270,63 @@ class Housing(object):
             ('num_pipeline', num_pipeline),
             ('cat_pipeline', cat_pipeline),
         ])
-        housing_prepared = full_pipeline.fit_transform(self.train_set)
+        print(X.head())
+        housing_prepared = full_pipeline.fit_transform(X)
+        lin_reg = LinearRegression()
+        lin_reg.fit(housing_prepared, x_labels)
+        housing_predictions = lin_reg.predict(housing_prepared)
+        from sklearn.metrics import mean_squared_error
+        lin_mse = mean_squared_error(x_labels, housing_predictions)
+        lin_rmse = np.sqrt(lin_mse)
+        print("lin_reg rmse: " + str(lin_rmse))
+        from sklearn.metrics import mean_absolute_error
+        lin_mae = mean_absolute_error(x_labels, housing_predictions)
+        print("lin_reg mae: " + str(lin_mae))
+        from sklearn.tree import DecisionTreeRegressor
+        tree_reg = DecisionTreeRegressor(random_state=42)
+        tree_reg.fit(housing_prepared, x_labels)
+        housing_predictions = tree_reg.predict(housing_prepared)
+        tree_mse = mean_squared_error(x_labels, housing_predictions)
+        tree_rmse = np.sqrt(tree_mse)
+        print("tree_reg rmse: " + str(tree_rmse))
 
+
+        def display_error(scores, name):
+            print(name + "Scores:", scores)
+            print(name + "Mean:", scores.mean())
+            print(name + "Standard deviation:", scores.std())
+
+        from sklearn.model_selection import cross_val_score
+        scores = cross_val_score(tree_reg, housing_prepared, x_labels,
+            scoring="neg_mean_squared_error", cv=10)
+        tree_rmse_scores = np.sqrt(-scores)
+        display_error(tree_rmse_scores, "tree_reg")
+
+        lin_scores = cross_val_score(lin_reg, housing_prepared, x_labels,
+            scoring="neg_mean_squared_error", cv=10)
+        lin_rmse_scores = np.sqrt(-lin_scores)
+        display_error(lin_rmse_scores, "lin_reg")
+
+        from sklearn.ensemble import RandomForestRegressor
+        forest_reg = RandomForestRegressor(random_state=42)
+        forest_reg.fit(housing_prepared, x_labels)
+        housing_predictions = forest_reg.predict(housing_prepared)
+        forest_mse = mean_squared_error(x_labels, housing_predictions)
+        forest_rmse = np.sqrt(forest_mse)
+        print("forest_rmse: "+ str(forest_rmse))
+        forest_scores = cross_val_score(forest_reg, housing_prepared, x_labels,
+            scoring="neg_mean_squared_error", cv=10)
+        forest_rmse_scores = np.sqrt(-forest_scores)
+        display_error(forest_rmse_scores, "forest_rmse_scores")
+
+        scores = cross_val_score(lin_reg, housing_prepared, x_labels, scoring="neg_mean_squared_error", cv=10)
+        pd.Series(np.sqrt(-scores)).describe()
+
+        
+if __name__ == "__main__":
+    csv_data_path = "./datasets/housing/housing.csv"
+    housing_obj = Housing(csv_data_path)
+    housing_obj.run()
 
 
 

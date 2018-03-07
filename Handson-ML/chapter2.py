@@ -390,7 +390,7 @@ class Housing(object):
         cat_encoder = cat_pipeline.named_steps["cat_encoder"]
         cat_one_hot_attribs = list(cat_encoder.categories_[0])
         attributes = num_attribs + extra_attribs + cat_one_hot_attribs
-        #self.grid_search_forest_reg(housing_prepared, x_labels, attributes)
+        self.grid_search_forest_reg(housing_prepared, x_labels, attributes)
         self.random_search_forest_reg(housing_prepared, x_labels, attributes)
         
 if __name__ == "__main__":

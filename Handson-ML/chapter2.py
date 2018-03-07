@@ -321,6 +321,25 @@ class Housing(object):
         svm_rmse = np.sqrt(svm_mse)
         print("svm_rmse: " + str(svm_rmse))
 
+    def grid_search_svr_reg(self, housing_prepared, housing_labels, attributes):
+        from sklearn.model_selection import GridSearchCV
+        param_grid = [
+            {'kernel': ['linear'], 'C': [10., 30., 100., 300., 1000., 3000., 10000., 30000.0]},
+            {'kernel': ['rbf'], 'C': [1.0, 3.0, 10., 30., 100., 300., 1000.0],
+                'gamma': [0.01, 0.03, 0.1, 0.3, 1.0, 3.0]},
+        ]
+        svm_reg = SVR()
+        grid_search = GridSearchCV(svm_reg, param_grid, cv=5, scoring='neg_mean_squared_error', verbose=2, n_jobs=4)
+        grid_search.fit(housing_prepared, housing_labels)
+        print(grid_search.best_estimator_)
+        feature_importances = grid_search.best_estimator_.feature_importances_
+        print("feature_importances-------------------------")
+        print(feature_importances)
+        ret = sorted(zip(feature_importances, attributes), reverse=True)
+        print(ret)
+        return grid_search.best_estimator_
+
+
     # 使用网格搜索来寻找最佳超参数
     def grid_search_forest_reg(self, housing_prepared, housing_labels, attributes):
         from sklearn.model_selection import GridSearchCV
@@ -436,6 +455,7 @@ class Housing(object):
         attributes = num_attribs + extra_attribs + cat_one_hot_attribs
         best_model = self.grid_search_forest_reg(housing_prepared, x_labels, attributes)
         best_model = self.random_search_forest_reg(housing_prepared, x_labels, attributes)
+        best_mddel = self.grid_search_svr_reg(housing_prepared, x_labels, attributes)
 
         # step7: 将模型应用到测试集
         X_test = self.test_set.drop(y_feature_name, axis=1)

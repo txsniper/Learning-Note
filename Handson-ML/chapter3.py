@@ -1,4 +1,7 @@
 from sklearn.datasets import fetch_mldata
+from sklearn.model_selection import cross_val_score
+from sklearn.model_selection import cross_val_predict
+from sklearn.metrics import confusion_matrix, precision_score, recall_score, f1_score
 import numpy as np
 
 class Mnist(object):
@@ -40,10 +43,21 @@ class Mnist(object):
         y_test_5  = (self.y_test  == 5)
 
         from sklearn.linear_model import SGDClassifier
-        sgd_clf = SGDClassifier(random_state=42)
+        sgd_clf = SGDClassifier(max_iter=10, random_state=42)
         sgd_clf.fit(self.X_train, y_train_5)
 
-        self.my_cross_val_score(sgd_clf, y_train_5)
+        #self.my_cross_val_score(sgd_clf, y_train_5)
+
+        #ret = cross_val_score(sgd_clf, self.X_train, y_train_5, cv=10, scoring="accuracy")
+        #print(ret)
+        y_train_pred = cross_val_predict(sgd_clf, self.X_train, y_train_5, cv=10)
+        print(confusion_matrix(y_train_5, y_train_pred))
+        print(precision_score(y_train_5, y_train_pred))
+        print(recall_score(y_train_5, y_train_pred))
+        print(f1_score(y_train_5, y_train_pred))
+
+
+
 
 
 

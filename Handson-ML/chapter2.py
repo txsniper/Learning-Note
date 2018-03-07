@@ -326,6 +326,7 @@ class Housing(object):
         print(feature_importances)
         ret = sorted(zip(feature_importances, attributes), reverse=True)
         print(ret)
+        return grid_search.best_estimator_
 
     # 随机搜索寻找最佳超参数
     def random_search_forest_reg(self, housing_prepared, housing_labels, attributes):
@@ -349,6 +350,7 @@ class Housing(object):
         print(feature_importances)
         ret = sorted(zip(feature_importances, attributes), reverse=True)
         print(ret)
+        return rnd_search.best_estimator_
 
     def run(self):
         # step1: 构建训练集与测试集
@@ -413,8 +415,19 @@ class Housing(object):
         cat_encoder = cat_pipeline.named_steps["cat_encoder"]
         cat_one_hot_attribs = list(cat_encoder.categories_[0])
         attributes = num_attribs + extra_attribs + cat_one_hot_attribs
-        self.grid_search_forest_reg(housing_prepared, x_labels, attributes)
-        self.random_search_forest_reg(housing_prepared, x_labels, attributes)
+        best_model = self.grid_search_forest_reg(housing_prepared, x_labels, attributes)
+        best_model = self.random_search_forest_reg(housing_prepared, x_labels, attributes)
+
+        # step7: 将模型应用到测试集
+        X_test = self.test_set.drop(y_feature_name, axis=1)
+        y_test = self.test_set[y_feature_name].copy()
+
+        X_test_prepared = full_pipeline.transform(X_test)
+        X_test_prediction = best_model.predict(X_test_prepared)
+        final_mse = mean_squared_error(y_test, X_test_prediction)
+        final_rmse = np.sqrt(final_mse)
+        print("final_mse  : " + str(final_mse))
+        print("final_rmse : " + str(final_rmse))
         
 if __name__ == "__main__":
     csv_data_path = "./datasets/housing/housing.csv"

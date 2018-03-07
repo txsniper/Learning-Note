@@ -248,20 +248,26 @@ class Housing(object):
             print(name + "Mean:", scores.mean())
             print(name + "Standard deviation:", scores.std())
 
+    # 线性模型
     def lin_reg_prediction(self, housing_prepared, housing_labels):
         lin_reg = LinearRegression()
         lin_reg.fit(housing_prepared, housing_labels)
         housing_predictions = lin_reg.predict(housing_prepared)
+        # 平方误差
         lin_mse = mean_squared_error(housing_labels, housing_predictions)
         lin_rmse = np.sqrt(lin_mse)
         print("lin_reg rmse: " + str(lin_rmse))
+        # 绝对误差
         lin_mae = mean_absolute_error(housing_labels, housing_predictions)
         print("lin_reg mae: " + str(lin_mae))
+
+        # 10折交叉验证，使用平方误差，这里得出的是负值，下面使用 -lin_scores
         lin_scores = cross_val_score(lin_reg, housing_prepared, housing_labels,
             scoring="neg_mean_squared_error", cv=10)
         lin_rmse_scores = np.sqrt(-lin_scores)
         self.display_error(lin_rmse_scores, "lin_reg")
 
+    # 决策树
     def tree_reg_prediction(self, housing_prepared, housing_labels):
         tree_reg = DecisionTreeRegressor(random_state=42)
         tree_reg.fit(housing_prepared, housing_labels)
@@ -274,6 +280,7 @@ class Housing(object):
         tree_rmse_scores = np.sqrt(-scores)
         self.display_error(tree_rmse_scores, "tree_reg")
 
+    # 随机森林
     def forest_reg_prediction(self, housing_prepared, housing_labels):
         forest_reg = RandomForestRegressor(random_state=42)
         forest_reg.fit(housing_prepared, housing_labels)
@@ -286,6 +293,7 @@ class Housing(object):
         forest_rmse_scores = np.sqrt(-forest_scores)
         self.display_error(forest_rmse_scores, "forest_rmse_scores")
 
+    # svm 回归
     def svr_reg_prediction(self, housing_prepared, housing_labels):
         svm_reg = SVR(kernel="linear")
         svm_reg.fit(housing_prepared, housing_labels)
@@ -294,6 +302,7 @@ class Housing(object):
         svm_rmse = np.sqrt(svm_mse)
         print("svm_rmse: " + str(svm_rmse))
 
+    # 使用网格搜索来寻找最佳超参数
     def grid_search_forest_reg(self, housing_prepared, housing_labels, attributes):
         from sklearn.model_selection import GridSearchCV
         param_grid = [
@@ -318,6 +327,7 @@ class Housing(object):
         ret = sorted(zip(feature_importances, attributes), reverse=True)
         print(ret)
 
+    # 随机搜索寻找最佳超参数
     def random_search_forest_reg(self, housing_prepared, housing_labels, attributes):
         from sklearn.model_selection import RandomizedSearchCV
         from scipy.stats import randint
@@ -341,8 +351,10 @@ class Housing(object):
         print(ret)
 
     def run(self):
+        # step1: 构建训练集与测试集
         self.split_train_test(use_level=True)
 
+        # step2: 拆分feature和label
         y_feature_name = 'median_house_value'
         X = self.train_set.drop(y_feature_name, axis=1)
         x_labels = self.train_set[y_feature_name].copy()
@@ -352,6 +364,7 @@ class Housing(object):
         housing_extra_attribs = attr_addr.transform(self.data.values)
         housing_extra_attribs = pd.DataFrame(housing_extra_attribs, columns=list(self.data.columns) + ["rooms_per_household", "population_per_household"])
         '''
+        # step3: 区分数值特征和类别特征，对类别特征使用one-hot编码
         cat_feature_name = 'ocean_proximity'
         housing_num = X.drop(cat_feature_name, axis=1)
 
@@ -359,6 +372,11 @@ class Housing(object):
         print(num_attribs)
         cat_attribs = [cat_feature_name]
 
+        # step4:    num_pipeline, 数值类型特征处理流水线
+        #           DataFrameSelector : 特征选择器，选择数值类型特征
+        #           Imputer : 使用中间值填充缺失的特征值
+        #           CombinedAttributesAdder : 增加联合特征，由原始特征计算得出
+        #           StandardScaler : 特征归一化
         num_pipeline = Pipeline([
             ('selector', DataFrameSelector(num_attribs)),
             ('imputer', Imputer(strategy='median')),
@@ -366,18 +384,21 @@ class Housing(object):
             ('std_scaler', StandardScaler()),
         ])
 
+        # CategoricalEncoder : 类别特征做onhot编码
         cat_pipeline = Pipeline([
             ('selector', DataFrameSelector(cat_attribs)),
             ('cat_encoder', CategoricalEncoder(encoding="onehot-dense")),
         ])
-
+        # FeatureUnion中的对象可以并行操作
         full_pipeline = FeatureUnion(transformer_list=[
             ('num_pipeline', num_pipeline),
             ('cat_pipeline', cat_pipeline),
         ])
-        print(X.head())
+
+        # 数据处理
         housing_prepared = full_pipeline.fit_transform(X)
 
+        # step5 : 多种模型预测，使用默认超参数
         self.lin_reg_prediction(housing_prepared, x_labels)
         self.tree_reg_prediction(housing_prepared, x_labels)
         self.forest_reg_prediction(housing_prepared, x_labels)
@@ -386,6 +407,8 @@ class Housing(object):
         scores = cross_val_score(lin_reg, housing_prepared, x_labels, scoring="neg_mean_squared_error", cv=10)
         pd.Series(np.sqrt(-scores)).describe()
         '''
+
+        # step6: 使用网格搜索和随机搜索来寻找最佳超参数
         extra_attribs = ["rooms_per_household", "population_per_household", "bedrooms_per_room"]
         cat_encoder = cat_pipeline.named_steps["cat_encoder"]
         cat_one_hot_attribs = list(cat_encoder.categories_[0])

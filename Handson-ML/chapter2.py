@@ -455,7 +455,7 @@ class Housing(object):
         attributes = num_attribs + extra_attribs + cat_one_hot_attribs
         #best_model = self.grid_search_forest_reg(housing_prepared, x_labels, attributes)
         #best_model = self.random_search_forest_reg(housing_prepared, x_labels, attributes)
-        best_mddel = self.grid_search_svr_reg(housing_prepared, x_labels, attributes)
+        best_model = self.grid_search_svr_reg(housing_prepared, x_labels, attributes)
 
         # step7: 将模型应用到测试集
         X_test = self.test_set.drop(y_feature_name, axis=1)

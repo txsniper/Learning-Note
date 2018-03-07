@@ -1,4 +1,3 @@
-__author__ = 'tanxing01'
 from sklearn.preprocessing import Imputer, OneHotEncoder, LabelEncoder, StandardScaler
 from sklearn.model_selection import StratifiedShuffleSplit
 from sklearn.base import BaseEstimator, TransformerMixin
@@ -332,11 +331,13 @@ class Housing(object):
         grid_search = GridSearchCV(svm_reg, param_grid, cv=5, scoring='neg_mean_squared_error', verbose=2, n_jobs=4)
         grid_search.fit(housing_prepared, housing_labels)
         print(grid_search.best_estimator_)
+        '''
         feature_importances = grid_search.best_estimator_.feature_importances_
         print("feature_importances-------------------------")
         print(feature_importances)
         ret = sorted(zip(feature_importances, attributes), reverse=True)
         print(ret)
+        '''
         return grid_search.best_estimator_
 
 

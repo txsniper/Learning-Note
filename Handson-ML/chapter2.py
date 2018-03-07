@@ -280,6 +280,25 @@ class Housing(object):
         tree_rmse_scores = np.sqrt(-scores)
         self.display_error(tree_rmse_scores, "tree_reg")
 
+    def random_search_tree_reg(self, housing_prepared, housing_labels, attributes):
+        from sklearn.model_selection import RandomizedSearchCV
+        from scipy.stats import randint
+
+        param_distribs = {
+            'max_depth': randint(low=1, high=20),
+            'max_features': randint(low=1, high=12),
+        }
+        tree_reg = DecisionTreeRegressor(random_state=42)
+        rnd_search = RandomizedSearchCV(tree_reg, param_distributions=param_distribs,
+                        n_iter=10, cv=5, scoring='neg_mean_squared_error', random_state=42)
+        rnd_search.fit(housing_prepared, housing_labels)
+        feature_importances = rnd_search.best_estimator_.feature_importances_
+        print("feature_importances-------------------------")
+        print(feature_importances)
+        ret = sorted(zip(feature_importances, attributes), reverse=True)
+        print(ret)
+        return rnd_search.best_estimator_
+
     # 随机森林
     def forest_reg_prediction(self, housing_prepared, housing_labels):
         forest_reg = RandomForestRegressor(random_state=42)

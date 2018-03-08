@@ -1,7 +1,7 @@
 from sklearn.datasets import fetch_mldata
 from sklearn.model_selection import cross_val_score
 from sklearn.model_selection import cross_val_predict
-from sklearn.metrics import confusion_matrix, precision_score, recall_score, f1_score, precision_recall_curve
+from sklearn.metrics import confusion_matrix, precision_score, recall_score, f1_score, precision_recall_curve, roc_curve
 import numpy as np
 import matplotlib
 import matplotlib.pyplot as plt
@@ -47,6 +47,14 @@ class Mnist(object):
         plt.legend(loc="upper left")
         plt.ylim([0, 1])
 
+    def plot_roc_curve(self, fpr, tpr, label=None):
+        plt.plot(fpr, tpr, linewidth=2, label=label)
+        plt.plot([0, 1], [0, 1], 'k--')
+        plt.axis([0, 1, 0, 1])
+        plt.xlabel('False Positive Rate')
+        plt.ylabel('True Positive Rate')
+        plt.show()
+
     def classfier_5(self):
         y_train_5 = (self.y_train == 5)
         y_test_5  = (self.y_test  == 5)
@@ -72,10 +80,18 @@ class Mnist(object):
         plt.xlim([-700000, 700000])
         plt.show()
 
+        fpr, tpr, thresholds = roc_curve(y_train_5, y_scores)
+        self.plot_roc_curve(fpr, tpr)
 
-
-
-
+        from sklearn.ensemble import RandomForestClassifier
+        forest_clf = RandomForestClassifier(random_state=42)
+        y_probas_forest = cross_val_predict(forest_clf, self.X_train, y_train_5, cv=10, method="predict_proba")
+        y_scores_forest = y_probas_forest[:, 1]
+        fpr_forest, tpr_forest, thresholds_forest = roc_curve(y_train_5, y_scores_forest)
+        plt.plot(fpr, tpr, "b:", label="SGD")
+        self.plot_roc_curve(fpr_forest, tpr_forest, "Random Forest")
+        plt.legend(loc="bottom right")
+        plt.show()
 
 
 if __name__ == "__main__":

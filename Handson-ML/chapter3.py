@@ -1,8 +1,10 @@
 from sklearn.datasets import fetch_mldata
 from sklearn.model_selection import cross_val_score
 from sklearn.model_selection import cross_val_predict
-from sklearn.metrics import confusion_matrix, precision_score, recall_score, f1_score
+from sklearn.metrics import confusion_matrix, precision_score, recall_score, f1_score, precision_recall_curve
 import numpy as np
+import matplotlib
+import matplotlib.pyplot as plt
 
 class Mnist(object):
     def __init__(self):
@@ -38,6 +40,13 @@ class Mnist(object):
             n_correct = sum(y_test_pred == y_test_flods)
             print(n_correct / len(y_test_pred))
 
+    def plot_predision_recall_vs_threshold(self, precisions, recalls, thresholds):
+        plt.plot(thresholds, precisions[:-1], "b--", label="Precision")
+        plt.plot(thresholds, recalls[:-1], "g-", label="Recall")
+        plt.xlabel("Threshold")
+        plt.legend(loc="upper left")
+        plt.ylim([0, 1])
+
     def classfier_5(self):
         y_train_5 = (self.y_train == 5)
         y_test_5  = (self.y_test  == 5)
@@ -55,6 +64,14 @@ class Mnist(object):
         print(precision_score(y_train_5, y_train_pred))
         print(recall_score(y_train_5, y_train_pred))
         print(f1_score(y_train_5, y_train_pred))
+
+        y_scores = cross_val_predict(sgd_clf, self.X_train, y_train_5, cv=10, method="decision_function")
+        print(y_scores.shape)
+        precisions, recalls, thresholds = precision_recall_curve(y_train_5, y_scores)
+        self.plot_predision_recall_vs_threshold(precisions, recalls, thresholds)
+        plt.xlim([-700000, 700000])
+        plt.show()
+
 
 
 

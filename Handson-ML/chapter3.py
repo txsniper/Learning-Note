@@ -55,6 +55,34 @@ class Mnist(object):
         plt.ylabel('True Positive Rate')
         plt.show()
 
+    def multi_classfier(self):
+        from sklearn.multiclass import OneVsOneClassifier
+        from sklearn.linear_model import SGDClassifier
+        from sklearn.ensemble import RandomForestClassifier
+        from sklearn.preprocessing import StandardScaler
+        
+        some_digit = self.X[36000]
+        # 当直接用SGD做多分类时，SGD自动为每个类别训练了一个二分类模型(OvA: one-versus-all，除非使用SVM分类器，SGD会自动使用OvO)
+        sgd_clf = SGDClassifier(random_state=42)
+        sgd_clf.fit(self.X_train, self.y_train)
+
+        # 强制SGD使用OvO (One to One)
+        ovo_clf = OneVsOneClassifier(SGDClassifier(random_state=42))
+        ovo_clf.fit(self.X_train, self.y_train)
+
+        # 随机森林做多分类
+        forest_clf = RandomForestClassifier(random_state=42)
+        forest_clf.fit(self.X_train, self.y_train)
+
+        scaler = StandardScaler()
+        X_train_scaled = scaler.fit_transform(self.X_train.astype(np.float64))
+        y_train_pred = cross_val_predict(sgd_clf, X_train_scaled, self.y_train, cv=3)
+        conf_mx = confusion_matrix(self.y_train, y_train_pred)
+        print(conf_mx)
+        plt.matshow(conf_mx, cmap=plt.cm.gray)
+        plt.show()
+
+
     def classfier_5(self):
         y_train_5 = (self.y_train == 5)
         y_test_5  = (self.y_test  == 5)

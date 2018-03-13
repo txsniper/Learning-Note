@@ -61,6 +61,29 @@ class SVM(object):
         plot_dataset(X, y, [-1.5, 2.5, -1, 1.5])
         plt.show()
 
+        from sklearn.svm import SVC
+        poly_kernel_svm_clf = Pipeline((
+            ('scaler', StandardScaler()),
+            ('svm_clf', SVC(kernel='poly', degree=3, ceof=0.1, C=5))
+        ))
+        poly_kernel_svm_clf.fit(X, y)
+        poly100_kernel_svm_clf = Pipeline([
+            ("scaler", StandardScaler()),
+            ("svm_clf", SVC(kernel="poly", degree=10, coef0=100, C=5))
+        ])
+        poly100_kernel_svm_clf.fit(X, y)
+        plt.figure(figsize=(11, 4))
+        plt.subplot(121)
+        plot_predictions(poly_kernel_svm_clf, [-1.5, 2.5, -1, 1.5])
+        plot_dataset(X, y, [-1.5, 2.5, -1, 1.5])
+        plt.title(r"$d=3, r=1, C=5$", fontsize=18)
+
+        plt.subplot(122)
+        plot_predictions(poly100_kernel_svm_clf, [-1.5, 2.5, -1, 1.5])
+        plot_dataset(X, y, [-1.5, 2.5, -1, 1.5])
+        plt.title(r"$d=10, r=100, C=5$", fontsize=18)
+        plt.show()
+
 if __name__ == '__main__':
     obj = SVM()
     obj.load_data()

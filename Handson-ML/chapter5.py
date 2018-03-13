@@ -15,7 +15,7 @@ class SVM(object):
         self.data_set = iris
 
     def svc_soft_margin(self):
-        X = self.data_set['data'][:(2,3)]
+        X = self.data_set['data'][:, (2,3)]
         y = (self.data_set['target'] == 2).astype(np.float64)
         svm_clf = Pipeline((
             ('scaler', StandardScaler()),
@@ -30,6 +30,7 @@ class SVM(object):
         from sklearn.preprocessing import PolynomialFeatures
         X, y = make_moons(n_samples=100, noise=0.15, random_state=42)
 
+        
         def plot_dataset(X, y, axes):
             plt.plot(X[:, 0][y==0], X[:, 1][y==0], "bs")
             plt.plot(X[:, 0][y==1], X[:, 1][y==1], "g^")
@@ -38,8 +39,8 @@ class SVM(object):
             plt.xlabel(r"$x_1$", fontsize=20)
             plt.ylabel(r"$x_2$", fontsize=20, rotation=0)
         plot_dataset(X, y, [-1.5, 2.5, -1, 1.5])
-        plt.show()
-
+        #plt.show()
+        
         polynomial_svm_clf = Pipeline([
             ('poly_features', PolynomialFeatures(degree=3)),
             ('scaler', StandardScaler()),

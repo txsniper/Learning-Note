@@ -1,13 +1,15 @@
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-from sklearn.base import BaseEstimator, TransformerMixin
-from sklearn.preprocessing import StandardScaler
+from sklearn.preprocessing import StandardScaler, LabelEncoder
 from sklearn.linear_model import LogisticRegression
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.ensemble import GradientBoostingClassifier
 from sklearn.model_selection import cross_val_score
+from sklearn.model_selection import GridSearchCV, RandomizedSearchCV
 from sklearn.metrics import confusion_matrix, roc_curve, auc
+from sklearn.metrics import roc_auc_score  
+from sklearn.metrics import classification_report
 from sklearn import model_selection
 from scipy import sparse
 import os
@@ -80,19 +82,29 @@ class Titanic(object):
         data['Title'].replace(['Mlle','Mme','Ms','Dr','Major','Lady','Countess','Jonkheer','Col','Rev','Capt','Sir','Don'],
                     ['Miss','Miss','Miss','Mr','Mr','Mrs','Mrs','Other','Other','Other','Mr','Mr','Mr'], inplace=True)
 
+        # Age
         data.loc[(data.Age.isnull())&(data.Title=='Mr'),'Age']= data.Age[data.Title=="Mr"].mean()
         data.loc[(data.Age.isnull())&(data.Title=='Mrs'),'Age']= data.Age[data.Title=="Mrs"].mean()
         data.loc[(data.Age.isnull())&(data.Title=='Master'),'Age']= data.Age[data.Title=="Master"].mean()
         data.loc[(data.Age.isnull())&(data.Title=='Miss'),'Age']= data.Age[data.Title=="Miss"].mean()
         data.loc[(data.Age.isnull())&(data.Title=='Other'),'Age']= data.Age[data.Title=="Other"].mean()
 
+        label_encoder = LabelEncoder()
+        data['Age_Bin'] = pd.qcut(data['Age'], 5)
+        data['Age_Bin'] = label_encoder.fit_transform(data['Age_Bin'])
+
+        # Title
         data['Title'] = data['Title'].map( {'Mr': 0, 'Mrs': 1, 'Miss': 2, 'Master':3, 'Other':4} )
         data['Title'] = data['Title'].fillna(data['Title'].mode().iloc[0])
         data['Title'] = data['Title'].astype(int)
 
+
         data.loc[data['Cabin'].notnull(), 'Cabin'] = 'YES'
         data.loc[data['Cabin'].isnull(), 'Cabin'] = 'No'
+
         data['Fare'] = data['Fare'].fillna(data['Fare'].mean())
+        data['Fare_Bin'] = pd.qcut(data['Fare'], 4)
+        data['Fare_Bin'] = label_encoder.fit_transform(data['Fare_Bin'])
 
         # 类别特征one-hot编码
         #categorical_feature = ['Cabin', 'Embarked', 'Sex', 'Pclass']
@@ -104,23 +116,61 @@ class Titanic(object):
         # 增加特征，数据清洗
         one_hot_features = pd.concat(one_hot_list, axis=1)
         data = pd.concat([data, one_hot_features], axis=1)
-        data.drop(['Pclass', 'Name', 'Sex', 'Ticket', 'Cabin', 'Embarked', 'Cabin'], axis=1, inplace=True)
+        data.drop(['Pclass', 'Name', 'Sex', 'Ticket', 'Cabin', 'Embarked'], axis=1, inplace=True)
         return data
 
     def random_forest(self):
         train_data = self.preprocessing_feature(self.train_data)
+        #print(train_data.head())
         train_data_no_id = train_data.drop(['PassengerId'], axis=1)
         train_np = train_data_no_id.as_matrix()
         y = train_np[:, 0]
         X = train_np[:, 1:]
-        rf = RandomForestClassifier(n_estimators=200, max_depth=7)
-        rf.fit(X, y)
-        cross_score = cross_val_score(rf, X, y, cv=5)
-        print(cross_score)
+        param_grid = {
+            'n_estimators' : [ 100, 130, 150, 180, 200, 300],
+            'max_depth' : [3, 4, 5, 6, 7, 8],
+            'max_leaf_nodes' : [2, 3, 4, 5],
+
+        }
+        scores = ['roc_auc']
+        bclf = None
+        for score in scores:
+            rf = RandomForestClassifier(random_state=14)
+            grid = GridSearchCV(rf, param_grid, cv=5, scoring='%s' % score, verbose=1)
+            #grid = RandomizedSearchCV(rf, param_grid, cv=10, scoring='%s' % score, verbose=1)
+            grid.fit(X, y)
+        
+            print("Best parameters set found on development set:")  
+            print()  
+            print(grid.best_params_)  
+            print()  
+            print("Grid scores on development set:")  
+            print()  
+            means = grid.cv_results_['mean_test_score']  
+            stds = grid.cv_results_['std_test_score']  
+            for mean, std, params in zip(means, stds, grid.cv_results_['params']):  
+                print("%0.3f (+/-%0.03f) for %r"  % (mean, std * 2, params))  
+            print()  
+            print("Detailed classification report:")  
+            print()  
+            print("The model is trained on the full development set.")  
+            print("The scores are computed on the full evaluation set.")  
+            print()
+            
+            bclf = grid.best_estimator_ 
+            '''
+            bclf.fit(X, y)  
+            y_true = y  
+            y_pred = bclf.predict(X)  
+            y_pred_pro = bclf.predict_proba(X)  
+            y_scores = pd.DataFrame(y_pred_pro, columns=bclf.classes_.tolist())[1].values  
+            print(classification_report(y_true, y_pred))  
+            auc_value = roc_auc_score(y_true, y_scores)
+            '''
         test_data = self.preprocessing_feature(self.test_data)
         test = test_data.drop(['PassengerId'], axis=1)
-        #predictions = rf.predict(test.as_matrix())
-        #self.write_predictions_2_csv(test_data, predictions, "random_forest.csv")
+        predictions = bclf.predict(test.as_matrix())
+        self.write_predictions_2_csv(test_data, predictions, "random_forest.csv")
         
     def grand_boost(self):
         train_data = self.preprocessing_feature(self.train_data)
@@ -184,6 +234,6 @@ if __name__ == "__main__":
     obj.load_data()
     #obj.lr(dir_name)
     obj.random_forest()
-    obj.load_data()
-    obj.grand_boost()
+    #obj.load_data()
+    #obj.grand_boost()
     

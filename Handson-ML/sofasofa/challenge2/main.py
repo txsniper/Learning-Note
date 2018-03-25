@@ -19,7 +19,7 @@ class Main():
         self.test_data = pd.read_csv(self.test_path)
 
     def write_predictions_2_csv(self, test_data,  predictions, csv_name):
-        result = pd.DataFrame({'CaseId':test_data['CaseId'].as_matrix(), 'Evaluation':predictions.astype(np.int32)})
+        result = pd.DataFrame({'CaseId':test_data['CaseId'].as_matrix(), 'Evaluation':predictions.astype(np.float32)})
         result.to_csv(self.curr_dir + "/" + csv_name, index=False)
 
     def random_forest(self):
@@ -28,18 +28,23 @@ class Main():
         train_data = train_data.drop(['CaseId'], axis=1)
         y = train_data['Evaluation']
         X = train_data.drop(['Evaluation'], axis=1)
-        #rf = RandomForestClassifier()
-        rf = RandomForestClassifier(n_estimators=200, max_depth=4, max_leaf_nodes=5)
+        rf = RandomForestClassifier(random_state=42, n_estimators=2000)
         
-        param_grid = {
-            'n_estimators' : [200],
-            'max_depth' : [4],
-            'max_leaf_nodes' : [5],
-        }
-        #grid = GridSearchCV(rf, param_grid, cv=5, scoring='roc_auc', verbose=1, n_jobs=4)
-        #grid.fit(X, y)
+        #rf = RandomForestClassifier(n_estimators=200, max_depth=4, max_leaf_nodes=5, random_state=42)
+        scores = cross_val_score(rf, X, y, cv=8, scoring='roc_auc', verbose=1, n_jobs=5)
         rf.fit(X, y)
+        print(scores)
         '''
+        param_grid = {
+            'n_estimators' : [100, 120, 180, 190, 200, 220],
+            'max_depth' : [3, 4, 5, 6],
+            'max_leaf_nodes' : [2, 3, 4, 5],
+        }
+        grid = GridSearchCV(rf, param_grid, cv=5, scoring='roc_auc', verbose=1, n_jobs=4)
+        grid.fit(X, y)
+        #rf.fit(X, y)
+
+
         print("Best parameters set found on development set:")  
         print()  
         print(grid.best_params_)  
@@ -60,9 +65,11 @@ class Main():
         '''
         test_data = self.test_data
         test = test_data.drop(['CaseId'], axis=1)
+        #predictions = bclf.predict_proba(test)
         predictions = rf.predict_proba(test)
         # 每个样本标签为1的概率
         predictions_1 = predictions[:,1]
+        print(predictions_1[0:5])
         self.write_predictions_2_csv(test_data, predictions_1, "random_forest.csv")
 
 if __name__ == "__main__":

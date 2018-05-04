@@ -1,6 +1,7 @@
 from mxnet import gluon
 from mxnet import ndarray as nd 
 import matplotlib.pyplot as plt
+import math
 
 def transform(data, label):
     return data.astype('float32')/255, label.astype('float32')
@@ -45,6 +46,7 @@ for param in params:
 # step3: 定义模型
 from mxnet import nd
 def softmax(X):
+    X = X - X.max(axis=1).reshape((X.shape[0], -1))
     exp = nd.exp(X)
     partition = exp.sum(axis=1, keepdims=True)
     return exp / partition
@@ -53,7 +55,10 @@ def net(X):
     return softmax(nd.dot(X.reshape((-1, num_inputs)), W) + b)
 
 def cross_entropy(yhat, y):
-    return -nd.pick(nd.log(yhat), y)
+    ret = -nd.pick(nd.log(yhat), y)
+    #print("loss inf 1: " + str(yhat))
+    #print("loss inf 2: " + str(y))
+    return ret
 
 import sys
 sys.path.append('..')
@@ -61,16 +66,18 @@ from utils import *
 from mxnet import autograd
 
 learning_rate = 0.1
-for epoch in range(5):
+for epoch in range(10):
     train_loss = 0
     train_acc = 0
     for data, label in train_data:
         with autograd.record():
             output = net(data)
+            #print("output: " + str(output))
             loss = cross_entropy(output, label)
+            #print("loss: " + str(loss))
+            #input("press any key to continue ...")
         loss.backward()
         SGD(params, learning_rate / batch_size)
-
         train_loss += nd.mean(loss).asscalar()
         train_acc += accuracy(output, label)
     

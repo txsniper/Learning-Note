@@ -41,11 +41,6 @@ class Titanic(object):
             self.data_view_internal(feature_name)
 
     
-<<<<<<< HEAD
-    def handle_missing_value(self):
-        # age
-        pass
-=======
     def write_predictions_2_csv(self, test_data,  predictions, csv_name):
         result = pd.DataFrame({'PassengerId':test_data['PassengerId'].as_matrix(), 'Survived':predictions.astype(np.int32)})
         result.to_csv(self.curr_dir + "/" + csv_name, index=False)
@@ -55,7 +50,6 @@ class Titanic(object):
 
     def lr_with_validate(self, train_data): 
         split_train, split_cv = model_selection.train_test_split(train_data, test_size=0.3, random_state=42)
->>>>>>> 6b4a5774a5808ebe376794a463331dbe97a39045
         
         split_train = split_train.drop(['PassengerId'], axis=1)
         X_train = split_train.values[:,1:]

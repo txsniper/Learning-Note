@@ -21,6 +21,7 @@ class Titanic(object):
     
     def handle_missing_value(self):
         # age
+        pass
         
 
 if __name__ == "__main__":

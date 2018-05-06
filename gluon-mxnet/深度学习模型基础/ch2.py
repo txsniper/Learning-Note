@@ -1,3 +1,4 @@
+# 线性回归--使用Gluon
 from mxnet import ndarray as nd 
 from mxnet import autograd
 from mxnet import gluon

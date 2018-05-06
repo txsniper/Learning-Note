@@ -1,3 +1,4 @@
+# 多类逻辑回归--使用Gluon
 import sys
 sys.path.append('..')
 import utils

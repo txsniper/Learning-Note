@@ -61,6 +61,7 @@ def cross_entropy(yhat, y):
     return ret
 
 import sys
+# 多类逻辑回归--从零开始
 sys.path.append('..')
 from utils import *
 from mxnet import autograd

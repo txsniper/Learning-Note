@@ -1,3 +1,4 @@
+# 线性回归--从零开始
 from mxnet import ndarray as nd
 from mxnet import autograd
 import matplotlib.pyplot as plt

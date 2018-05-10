@@ -13,8 +13,7 @@ num_inputs = 28 * 28
 num_output = 10
 
 num_hidden = 256
-weight_scale = 0.01
-
+weight_scale = 0.1
 num_hidden1 = 128
 num_hidden2 = 64
 

@@ -76,3 +76,11 @@ def evaluate_accuracy(data_iterator, net):
         output = net(data)
         acc += accuracy(output, label)
     return acc / len(data_iterator)
+
+import mxnet as mx 
+try:
+    ctx = mx.gpu()
+    _ = nd.zeros((1, ), ctx=ctx)
+except:
+    ctx = mx.cpu()
+ctx

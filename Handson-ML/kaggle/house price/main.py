@@ -124,6 +124,7 @@ class Solution(object):
 from mxnet import ndarray as nd 
 from mxnet import autograd
 from mxnet import gluon
+from mxnet import initializer
 import matplotlib.pyplot as plt
 
 square_loss = gluon.loss.L2Loss()
@@ -144,10 +145,10 @@ class MXNetSolution(object):
         y_train.reshape((num_train, 1))
         X_test = nd.array(X_test)
         k = 5
-        epochs = 100
-        verbose_epoch = 95
+        epochs = 800
+        verbose_epoch = 780
         learning_rate = 5
-        weight_decay = 0.0
+        weight_decay = 0.1
 
         train_loss, test_loss = self.k_fold_cross_valid(k, epochs, verbose_epoch, X_train, y_train, learning_rate, weight_decay)
         print("%d-fold validation: Avg train loss: %f, Avg test loss: %f" %(k, train_loss, test_loss))
@@ -156,8 +157,10 @@ class MXNetSolution(object):
         net = gluon.nn.Sequential()
         # name_scope给参数一个唯一的名字，便于load/save模型
         with net.name_scope():
+            #net.add(gluon.nn.Dense(100, activation='relu'))
+            #net.add(gluon.nn.Dense(50, activation='relu'))
             net.add(gluon.nn.Dense(1))
-        net.initialize()
+        net.initialize(init=initializer.Xavier())
         return net
 
     def get_rmse_log(self, net, X_train, y_train):
@@ -214,7 +217,6 @@ class MXNetSolution(object):
         fold_size = X_train.shape[0] // k
         train_loss_sum = 0.0
         test_loss_sum = 0.0
-        print(y_train.shape)
         for test_i in range(k):
             X_val_test = X_train[test_i * fold_size: (test_i + 1) * fold_size, :]
             y_val_test = y_train[test_i * fold_size: (test_i + 1) * fold_size]
@@ -222,7 +224,6 @@ class MXNetSolution(object):
             val_train_defined = False
             for i in range(k):
                 if i != test_i:
-                    print(i * fold_size)
                     X_cur_fold = X_train[i * fold_size: (i + 1) * fold_size, :]
                     y_cur_fold = y_train[i * fold_size: (i + 1) * fold_size]
                     if not val_train_defined:

@@ -239,7 +239,17 @@ class MXNetSolution(object):
             train_loss_sum += train_loss
             print("Test loss: %f" % test_loss)
             test_loss_sum += test_loss
-        return train_loss_sum / k, test_loss_sum / k        
+        return train_loss_sum / k, test_loss_sum / k    
+
+    def learn(self, epochs, verbose_epoch, X_train, y_train, test, learning_rate,
+          weight_decay):
+        net = get_net()
+        train(net, X_train, y_train, None, None, epochs, verbose_epoch,
+                learning_rate, weight_decay)
+        preds = net(X_test).asnumpy()
+        test['SalePrice'] = pd.Series(preds.reshape(1, -1)[0])
+        submission = pd.concat([test['Id'], test['SalePrice']], axis=1)
+        submission.to_csv(self.dir_name + '/submission.csv', index=False)    
     
 
 if __name__ == "__main__":

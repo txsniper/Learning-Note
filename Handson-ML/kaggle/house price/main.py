@@ -134,10 +134,11 @@ class MXNetSolution(object):
 
     def process(self):
         self.solution.load_data()
-        X_train, y_train, X_test = self.solution.process_data()
+        X_train, X_test, y_train = self.solution.process_data()
         num_train = X_train.shape[0]
-        print(num_train)
-        exit(0)
+        print(X_train.shape)
+        print(y_train.shape)
+        
         X_train = nd.array(X_train)
         y_train = nd.array(y_train)
         y_train.reshape((num_train, 1))
@@ -213,6 +214,7 @@ class MXNetSolution(object):
         fold_size = X_train.shape[0] // k
         train_loss_sum = 0.0
         test_loss_sum = 0.0
+        print(y_train.shape)
         for test_i in range(k):
             X_val_test = X_train[test_i * fold_size: (test_i + 1) * fold_size, :]
             y_val_test = y_train[test_i * fold_size: (test_i + 1) * fold_size]
@@ -220,6 +222,7 @@ class MXNetSolution(object):
             val_train_defined = False
             for i in range(k):
                 if i != test_i:
+                    print(i * fold_size)
                     X_cur_fold = X_train[i * fold_size: (i + 1) * fold_size, :]
                     y_cur_fold = y_train[i * fold_size: (i + 1) * fold_size]
                     if not val_train_defined:

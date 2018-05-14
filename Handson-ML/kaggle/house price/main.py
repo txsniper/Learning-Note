@@ -145,8 +145,8 @@ class MXNetSolution(object):
         y_train.reshape((num_train, 1))
         X_test = nd.array(X_test)
         k = 5
-        epochs = 600
-        verbose_epoch = 580
+        epochs = 800
+        verbose_epoch = 780
         learning_rate = 5
         weight_decay = 0.1
 

@@ -29,12 +29,13 @@ class Solution(object):
 
         # 删掉无用特征
         print("delete useless feature")
-        all_X.drop(['Utilities'], axis=1, inplace=True)
+        #all_X.drop(['Utilities'], axis=1, inplace=True)
 
         # 数值特征标准化
         print("numeric feature processing")
         numeric_feats = all_X.dtypes[all_X.dtypes != "object"].index
-        all_X[numeric_feats] = all_X[numeric_feats].apply(lambda x: (x - x.mean() / x.std()))
+        all_X[numeric_feats] = all_X[numeric_feats].apply(lambda x: ((x - x.mean()) / x.std()))
+        #all_X[numeric_feats] = all_X[numeric_feats].apply(lambda x: (x - x.mean() / x.std()))
 
         # 类别数据转换为数值数据
         print("categorary feature processing")
@@ -136,6 +137,8 @@ class MXNetSolution(object):
     def process(self):
         self.solution.load_data()
         X_train, X_test, y_train = self.solution.process_data()
+        #print(X_train[0:5])
+        #exit(0)
         num_train = X_train.shape[0]
         print(X_train.shape)
         print(y_train.shape)
@@ -145,22 +148,28 @@ class MXNetSolution(object):
         y_train.reshape((num_train, 1))
         X_test = nd.array(X_test)
         k = 5
-        epochs = 800
-        verbose_epoch = 780
+        epochs = 300
+        verbose_epoch = 295
         learning_rate = 5
-        weight_decay = 0.1
+        weight_decay = 0.0
 
-        train_loss, test_loss = self.k_fold_cross_valid(k, epochs, verbose_epoch, X_train, y_train, learning_rate, weight_decay)
-        print("%d-fold validation: Avg train loss: %f, Avg test loss: %f" %(k, train_loss, test_loss))
+        test = pd.read_csv(self.solution.test_file)
+        #train_loss, test_loss = self.k_fold_cross_valid(k, epochs, verbose_epoch, X_train, y_train, learning_rate, weight_decay)
+        #print("%d-fold validation: Avg train loss: %f, Avg test loss: %f" %(k, train_loss, test_loss))
+        self.learn(epochs, verbose_epoch, X_train, y_train, X_test, test, learning_rate, weight_decay)
 
     def get_net(self):
         net = gluon.nn.Sequential()
+        drop_prob = 0.2
         # name_scope给参数一个唯一的名字，便于load/save模型
         with net.name_scope():
             #net.add(gluon.nn.Dense(100, activation='relu'))
-            #net.add(gluon.nn.Dense(50, activation='relu'))
+            #net.add(gluon.nn.Dense(100))
+            #net.add(gluon.nn.BatchNorm(axis=1))
+            #net.add(gluon.nn.Dropout(drop_prob))
+            #net.add(gluon.nn.Activation(activation='relu'))
             net.add(gluon.nn.Dense(1))
-        net.initialize(init=initializer.Xavier())
+        net.initialize(init=initializer.Uniform())
         return net
 
     def get_rmse_log(self, net, X_train, y_train):
@@ -242,15 +251,15 @@ class MXNetSolution(object):
             test_loss_sum += test_loss
         return train_loss_sum / k, test_loss_sum / k    
 
-    def learn(self, epochs, verbose_epoch, X_train, y_train, test, learning_rate,
+    def learn(self, epochs, verbose_epoch, X_train, y_train, X_test, test, learning_rate,
           weight_decay):
-        net = get_net()
-        train(net, X_train, y_train, None, None, epochs, verbose_epoch,
+        net = self.get_net()
+        self.train(net, X_train, y_train, None, None, epochs, verbose_epoch,
                 learning_rate, weight_decay)
         preds = net(X_test).asnumpy()
         test['SalePrice'] = pd.Series(preds.reshape(1, -1)[0])
         submission = pd.concat([test['Id'], test['SalePrice']], axis=1)
-        submission.to_csv(self.dir_name + '/submission.csv', index=False)    
+        submission.to_csv(self.solution.dir_name + '/submission.csv', index=False)    
     
 
 if __name__ == "__main__":

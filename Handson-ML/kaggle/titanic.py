@@ -28,8 +28,9 @@ class Titanic(object):
         self.train_data.info()
         ret = self.train_data.describe()
         print(ret)
-        self.train_data.hist(bins=50, figsize=(20, 15))
-        plt.show()
+        print(self.train_data.head())
+        #self.train_data.hist(bins=50, figsize=(20, 15))
+        #plt.show()
 
     def data_view_internal(self, name):
         print('-'*40)
@@ -232,8 +233,9 @@ if __name__ == "__main__":
     dir_name = os.path.dirname(os.path.realpath(__file__))
     obj = Titanic(dir_name, dir_name + '/train.csv', dir_name + '/test.csv')
     obj.load_data()
+    obj.data_describe()
     #obj.lr(dir_name)
-    obj.random_forest()
+    #obj.random_forest()
     #obj.load_data()
     #obj.grand_boost()
     

@@ -5,6 +5,7 @@ from sklearn.model_selection import GridSearchCV, RandomizedSearchCV
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.ensemble import GradientBoostingRegressor
 from sklearn.model_selection import cross_val_score
+from sklearn.utils import shuffle
 
 
 class Solution(object):
@@ -15,6 +16,7 @@ class Solution(object):
 
     def load_data(self):
         self.train_data = pd.read_csv(self.train_file)
+        self.train_data = shuffle(self.train_data)
         self.test_data = pd.read_csv(self.test_file)
         ret = self.train_data.describe()
         #print(self.train_data.head())
@@ -29,7 +31,7 @@ class Solution(object):
 
         # 删掉无用特征
         print("delete useless feature")
-        #all_X.drop(['Utilities'], axis=1, inplace=True)
+        all_X.drop(['Utilities'], axis=1, inplace=True)
 
         # 数值特征标准化
         print("numeric feature processing")
@@ -59,8 +61,8 @@ class Solution(object):
 
     def random_forest(self):
         X_train,  X_test, y_train = self.process_data()
-        rf = RandomForestRegressor(n_estimators=600, random_state=14, max_depth=15)
-        #rf.fit(X_train, y_train)
+        rf = RandomForestRegressor(n_estimators=80, random_state=14, max_depth=12)
+        rf.fit(X_train, y_train)
         cross_score = np.sqrt(-cross_val_score(rf, X_train, y_train,n_jobs=4, cv=5, scoring='neg_mean_squared_error', verbose=1))
         print(cross_score)
 
@@ -68,13 +70,13 @@ class Solution(object):
 
     def gbr(self):
         X_train,  X_test, y_train = self.process_data()
-        gbr_model = GradientBoostingRegressor(learning_rate=0.1, n_estimators=150, max_depth=4, random_state=15)
+        gbr_model = GradientBoostingRegressor(learning_rate=0.15, n_estimators=200, max_depth=4, random_state=15)
         gbr_model.fit(X_train, y_train)
-        cross_score = np.sqrt(-cross_val_score(gbr_model, X_train, y_train,n_jobs=4, cv=5, scoring='neg_mean_squared_error', verbose=1))
+        cross_score = np.sqrt(-cross_val_score(gbr_model, X_train, y_train,n_jobs=3, cv=3, scoring='neg_mean_squared_error', verbose=1))
         print(cross_score)
         predictions = gbr_model.predict(X_test)
-        print(predictions)
-        self.write_predictions_2_csv(self.test_data, predictions, "gbr.csv")
+        #print(predictions)
+        #self.write_predictions_2_csv(self.test_data, predictions, "gbr.csv")
 
     def random_forest_grid_search(self):
         X_train,  X_test, y_train = self.process_data()
@@ -147,16 +149,16 @@ class MXNetSolution(object):
         y_train = nd.array(y_train)
         y_train.reshape((num_train, 1))
         X_test = nd.array(X_test)
-        k = 5
-        epochs = 300
-        verbose_epoch = 295
-        learning_rate = 5
-        weight_decay = 0.0
+        k = 3
+        epochs = 80
+        verbose_epoch = 75
+        learning_rate = 0.005
+        weight_decay = 0.9
 
         test = pd.read_csv(self.solution.test_file)
-        #train_loss, test_loss = self.k_fold_cross_valid(k, epochs, verbose_epoch, X_train, y_train, learning_rate, weight_decay)
-        #print("%d-fold validation: Avg train loss: %f, Avg test loss: %f" %(k, train_loss, test_loss))
-        self.learn(epochs, verbose_epoch, X_train, y_train, X_test, test, learning_rate, weight_decay)
+        train_loss, test_loss = self.k_fold_cross_valid(k, epochs, verbose_epoch, X_train, y_train, learning_rate, weight_decay)
+        print("%d-fold validation: Avg train loss: %f, Avg test loss: %f" %(k, train_loss, test_loss))
+        #self.learn(epochs, verbose_epoch, X_train, y_train, X_test, test, learning_rate, weight_decay)
 
     def get_net(self):
         net = gluon.nn.Sequential()
@@ -164,7 +166,8 @@ class MXNetSolution(object):
         # name_scope给参数一个唯一的名字，便于load/save模型
         with net.name_scope():
             #net.add(gluon.nn.Dense(100, activation='relu'))
-            #net.add(gluon.nn.Dense(100))
+            net.add(gluon.nn.Dense(70, activation='relu'))
+            net.add(gluon.nn.Dense(30, activation='relu'))
             #net.add(gluon.nn.BatchNorm(axis=1))
             #net.add(gluon.nn.Dropout(drop_prob))
             #net.add(gluon.nn.Activation(activation='relu'))
@@ -267,7 +270,7 @@ if __name__ == "__main__":
     obj = Solution(dir_name, dir_name + '/train.csv', dir_name + '/test.csv')
     obj.load_data()
     #obj.random_forest()
-    #obj.gbr()
+    obj.gbr()
 
-    net_obj = MXNetSolution(dir_name, dir_name + '/train.csv', dir_name + '/test.csv')
-    net_obj.process()
+    #net_obj = MXNetSolution(dir_name, dir_name + '/train.csv', dir_name + '/test.csv')
+    #net_obj.process()

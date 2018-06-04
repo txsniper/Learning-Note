@@ -12,7 +12,7 @@ EOS = '<eos>'
 epochs = 40
 epoch_period = 10
 lr = 0.005
-batch_size = 2
+batch_size = 4
 max_seq_len = 5
 max_test_output_len = 20
 encoder_num_layers = 1
@@ -76,7 +76,7 @@ dataset = gdata.ArrayDataset(fr, en)
 
 class Encoder(nn.Block):
     def __init__(self, num_inputs, num_hiddens, num_layers, drop_prob, **kwargs):
-        super(Encoder, self).__init__(kwargs)
+        super(Encoder, self).__init__(**kwargs)
         with self.name_scope():
             # 词向量
             self.embedding = nn.Embedding(num_inputs, num_hiddens)
@@ -85,9 +85,21 @@ class Encoder(nn.Block):
                                input_size=num_hiddens)
 
     def forward(self, inputs, state):
-        embedding = self.embedding(inputs).swapaxes(0, 1)
+        # print(inputs)
+        # inputs: (batch_size, step_size)
+        embedding = self.embedding(inputs)
+
+        # embedding: (batch_size, step_size, num_hiddens)
+        #print(embedding.shape)
+        
+        # swapaxes之后: embedding: (step_size, batch_size, num_hiddens)
+        embedding = embedding.swapaxes(0, 1)
+        #print(embedding.shape)
         embedding = self.dropout(embedding)
+
+        # GRU输入数据格式: (sequence_length, batch_size, input_size)
         output, state = self.rnn(embedding, state)
+        #print(output.shape)
         return output, state
 
     def begin_state(self, *args, **kwargs):
@@ -113,7 +125,7 @@ class Decoder(nn.Block):
             with self.attention.name_scope():
                 self.attention.add(
                     # 注意力第一层:
-                    # 输入： num_hiddens(y的词向量) + encoder_num_hiddens(Encoder的输出)
+                    # 输入： num_hiddens(Decoder隐含状态) + encoder_num_hiddens(Encoder隐含状态)
                     # 输出： alignment_size(对齐)
                     nn.Dense(alignment_size,
                         in_units=num_hiddens + encoder_num_hiddens,
@@ -133,12 +145,16 @@ class Decoder(nn.Block):
             self.rnn_concat_input = nn.Dense(
                     num_hiddens, in_units=num_hiddens + encoder_num_hiddens,
                     flatten=False)
-        
+
+    # cur_input: 当前输入，batch_size个
+    #    
     def forward(self, cur_input, state, encoder_outputs):
+        print(state)
         # 当 RNN 为多层时，取最靠近输出层的单层隐藏状态。
         single_layer_state = [state[0][-1].expand_dims(0)]
         encoder_outputs = encoder_outputs.reshape((self.max_seq_len, -1,
                                                    self.encoder_num_hiddens))
+        print(encoder_outputs.shape)
         hidden_broadcast = nd.broadcast_axis(single_layer_state[0], axis=0,
                                              size=self.max_seq_len)
         encoder_outputs_and_hiddens = nd.concat(encoder_outputs,
@@ -157,6 +173,7 @@ class Decoder(nn.Block):
                                    size=self.num_layers)]
         output, state = self.rnn(concat_input, state)
         output = self.dropout(output)
+        print(output.shape)
         output = self.out(output).reshape((-3, -1))
         return output, state
 
@@ -232,19 +249,34 @@ def train(encoder, decoder, decoder_init_state, max_seq_len, ctx,
             with autograd.record():
                 l = nd.array([0], ctx=ctx)
                 valid_length = nd.array([0], ctx=ctx)
+
+                # encoder状态尺寸： （num_layers， batch_size, hidden_dim)
                 encoder_state = encoder.begin_state(
                     func=nd.zeros, batch_size=cur_batch_size, ctx=ctx)
+                print(encoder_state)
+                
                 encoder_outputs, encoder_state = encoder(x, encoder_state)
 
                 # For an input array with shape (d1, d2, ..., dk), flatten operation reshapes the input array into # an output array of shape (d1, d2*...*dk)
                 # flatten将矩阵变换为二维的，将每个
+                print(encoder_outputs.shape)
                 encoder_outputs = encoder_outputs.flatten()
+                print(encoder_outputs.shape)
+                
                 # 解码器的第一个输入为 BOS 字符。
                 decoder_input = nd.array(
                     [output_vocab.token_to_idx[BOS]] * cur_batch_size,
                     ctx=ctx)
+                print(decoder_input)
+            
                 mask = nd.ones(shape=(cur_batch_size,), ctx=ctx)
+
+                # encoder_state是一个list,其中的每个元素是一个()
+                print(encoder_state[0].shape)
+                print(len(encoder_state))
                 decoder_state = decoder_init_state(encoder_state[0])
+                exit(0)
+                print(decoder_state)
                 for i in range(max_seq_len):
                     decoder_output, decoder_state = decoder(
                         decoder_input, decoder_state, encoder_outputs)
@@ -272,8 +304,8 @@ def train(encoder, decoder, decoder_init_state, max_seq_len, ctx,
                       max_seq_len)
 
 
-encoder = Encoder(len(input_vocab), encoder_num_hiddens, encoder_num_layers,
-                  encoder_drop_prob)
+encoder = Encoder(len(input_vocab), encoder_num_hiddens, encoder_num_layers, 
+                    encoder_drop_prob)
 decoder = Decoder(decoder_num_hiddens, len(output_vocab),
                   decoder_num_layers, max_seq_len, decoder_drop_prob,
                   alignment_size, encoder_num_hiddens)

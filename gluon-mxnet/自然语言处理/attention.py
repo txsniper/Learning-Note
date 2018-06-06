@@ -147,40 +147,75 @@ class Decoder(nn.Block):
                     flatten=False)
 
     # cur_input: 当前输入，batch_size个
-    #    
+    # state: 解码器的状态
+    # encoder_outputs: 编码器的输出，也就是编码器每个时刻的隐含状态(注意力机制需要)  
     def forward(self, cur_input, state, encoder_outputs):
-        print(state)
+        # print(state[0][-1])
         # 当 RNN 为多层时，取最靠近输出层的单层隐藏状态。
+        # -1表示取最后一层
         single_layer_state = [state[0][-1].expand_dims(0)]
+        #print(encoder_outputs.shape)
+        # encoder_outpus: (step_size, batch_size, hidden_dim)
         encoder_outputs = encoder_outputs.reshape((self.max_seq_len, -1,
                                                    self.encoder_num_hiddens))
-        print(encoder_outputs.shape)
+        #print(single_layer_state)
+        
+        # single_layer_state : (1, batch_size, hidden_dim)
+        # hidden_broadcast: (step_size, batch_size, hidden_dim)
         hidden_broadcast = nd.broadcast_axis(single_layer_state[0], axis=0,
                                              size=self.max_seq_len)
+
+        # encoder输出 + decoder上一个时刻的状态 , 作为attention的输入                                    
         encoder_outputs_and_hiddens = nd.concat(encoder_outputs,
                                                 hidden_broadcast, dim=2)
+        # energy : (step_size, batch_size, 1)
         energy = self.attention(encoder_outputs_and_hiddens)
+
+        # attention 计算权重
+        # batch_attention : (batch_size, 1, step_size)       
         batch_attention = nd.softmax(energy, axis=0).transpose((1, 2, 0))
+
+        # batch_encoder_outputs: (batch_size, step_size, hidden_dim)
         batch_encoder_outputs = encoder_outputs.swapaxes(0, 1)
+        
+        # attention 权重与encoder输出相乘,得到解码器背景向量
+        # decoder_context: (batch_size, 1, hidden_dim)
         decoder_context = nd.batch_dot(batch_attention, batch_encoder_outputs)
+        
+        # input_and_context: (batch_size, 1, attention + word2vec)
         input_and_context = nd.concat(
             nd.expand_dims(self.embedding(cur_input), axis=1),
             decoder_context, dim=2)
+        
+        # 利用一个单层(rnn_concat_input)缩小维度
+        # concat_input: (1, batch_size, hidden_dim)
         concat_input = self.rnn_concat_input(input_and_context).reshape(
             (1, -1, 0))
         concat_input = self.dropout(concat_input)
+
+        # state扩展为 num_layers 层
+        # state: (num_layers, batch_size, hidden_dim)
         state = [nd.broadcast_axis(single_layer_state[0], axis=0,
                                    size=self.num_layers)]
+
+        # state的最后一个元素就是output
         output, state = self.rnn(concat_input, state)
+        #print(output)
+        #print(state)
         output = self.dropout(output)
-        print(output.shape)
-        output = self.out(output).reshape((-3, -1))
+        output = self.out(output)
+
+        # https://github.com/apache/incubator-mxnet/issues/9693
+        # output = output.reshape((-3, -1)) 报错，替换为下面的代码
+        output = mx.nd.reshape(output, (-3, -1))
+    
         return output, state
 
     def begin_state(self, *args, **kwargs):
         return self.rnn.begin_state(*args, **kwargs)
 
-    
+
+# 输入使用编码器的最后时刻状态    
 class DecoderInitState(nn.Block):
     """解码器隐藏状态的初始化。"""
     def __init__(self, encoder_num_hiddens, decoder_num_hiddens, **kwargs):
@@ -253,35 +288,35 @@ def train(encoder, decoder, decoder_init_state, max_seq_len, ctx,
                 # encoder状态尺寸： （num_layers， batch_size, hidden_dim)
                 encoder_state = encoder.begin_state(
                     func=nd.zeros, batch_size=cur_batch_size, ctx=ctx)
-                print(encoder_state)
                 
+                # encoder_outputs尺寸: (step_size, batch_size, hidden_dim)
                 encoder_outputs, encoder_state = encoder(x, encoder_state)
 
                 # For an input array with shape (d1, d2, ..., dk), flatten operation reshapes the input array into # an output array of shape (d1, d2*...*dk)
-                # flatten将矩阵变换为二维的，将每个
-                print(encoder_outputs.shape)
+                # flatten将矩阵变换为二维的，encoder_outputs : (step_size, batch_size * hidden_dim)
                 encoder_outputs = encoder_outputs.flatten()
-                print(encoder_outputs.shape)
                 
                 # 解码器的第一个输入为 BOS 字符。
                 decoder_input = nd.array(
                     [output_vocab.token_to_idx[BOS]] * cur_batch_size,
                     ctx=ctx)
-                print(decoder_input)
-            
                 mask = nd.ones(shape=(cur_batch_size,), ctx=ctx)
 
                 # encoder_state是一个list,其中的每个元素是一个()
-                print(encoder_state[0].shape)
-                print(len(encoder_state))
+                #print(encoder_state[0].shape)
+                #print(len(encoder_state))
+                # 编码器的最终状态来初始化解码器的初始状态
                 decoder_state = decoder_init_state(encoder_state[0])
-                exit(0)
-                print(decoder_state)
+                #print(decoder_state)
                 for i in range(max_seq_len):
+                    # 解码器的输入: 解码器前一时刻状态, 前一时刻输出, 编码器的输出
                     decoder_output, decoder_state = decoder(
                         decoder_input, decoder_state, encoder_outputs)
+
                     # 解码器使用当前时刻的预测结果作为下一时刻的输入。
+                    # 输出所有词的概率，argmax在第1维上(第0维是bath_size)选择概率最大的那个
                     decoder_input = decoder_output.argmax(axis=1)
+
                     valid_length = valid_length + mask.sum()
                     l = l + (mask * loss(decoder_output, y[:, i])).sum()
                     mask = mask * (y[:, i] != eos_id)

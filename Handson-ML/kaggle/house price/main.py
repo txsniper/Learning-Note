@@ -7,6 +7,7 @@ from sklearn.ensemble import GradientBoostingRegressor
 from sklearn.model_selection import cross_val_score
 from sklearn.utils import shuffle
 
+pd.set_option('display.max_columns', None)
 
 class Solution(object):
     def __init__(self, dir_name, train_file, test_file):
@@ -16,12 +17,19 @@ class Solution(object):
 
     def load_data(self):
         self.train_data = pd.read_csv(self.train_file)
-        self.train_data = shuffle(self.train_data)
+        #self.train_data = shuffle(self.train_data)
         self.test_data = pd.read_csv(self.test_file)
         ret = self.train_data.describe()
         #print(self.train_data.head())
 
-    
+    def print_value_counts(self, all_data):
+        pass
+    def data_analyze(self):
+        all_data = pd.concat((self.train_data.drop('SalePrice', axis=1), self.test_data))
+        print(all_data.head(10))
+        train_corr = self.train_data.drop('Id',axis=1).corr()
+        print(train_corr['SalePrice'])
+
 
     def process_data(self):
         all_X = pd.concat((
@@ -270,7 +278,8 @@ if __name__ == "__main__":
     obj = Solution(dir_name, dir_name + '/train.csv', dir_name + '/test.csv')
     obj.load_data()
     #obj.random_forest()
-    obj.gbr()
+    #obj.gbr()
+    obj.data_analyze()
 
     #net_obj = MXNetSolution(dir_name, dir_name + '/train.csv', dir_name + '/test.csv')
     #net_obj.process()

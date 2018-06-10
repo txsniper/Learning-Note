@@ -19,16 +19,35 @@ class Solution(object):
         self.train_data = pd.read_csv(self.train_file)
         #self.train_data = shuffle(self.train_data)
         self.test_data = pd.read_csv(self.test_file)
-        ret = self.train_data.describe()
+        #ret = self.train_data.describe()
         #print(self.train_data.head())
 
     def print_value_counts(self, all_data):
-        pass
+        keys = all_data.columns.values.tolist()
+        for feature_name in keys:
+            print('----------------' + feature_name + '-----------------')
+            print(all_data[feature_name].value_counts())
+
     def data_analyze(self):
         all_data = pd.concat((self.train_data.drop('SalePrice', axis=1), self.test_data))
-        print(all_data.head(10))
+        #print(all_data.head(10))
+
+        # 检查特征间的相关系数 
         train_corr = self.train_data.drop('Id',axis=1).corr()
         print(train_corr['SalePrice'])
+
+        # 检查缺失值
+        # isnull对每个元素判断是否为空, 用 True/False 填充结果矩阵
+        # isnull().sum() 获取为空的行数
+        # isnull().count() 获取矩阵总行数
+        total = all_data.isnull().sum().sort_values(ascending=False)
+        percent = (all_data.isnull().sum() / all_data.isnull().count()).sort_values(ascending=False)
+        missing_data = pd.concat([total, percent], axis=1, keys=['Total','Lost Percent'])
+        print(missing_data)
+        #print(missing_data[missing_data.isnull().values==False].sort_values('Total', axis=0, ascending=False).head(20))
+
+        self.print_value_counts(all_data)
+
 
 
     def process_data(self):
@@ -36,6 +55,14 @@ class Solution(object):
             self.train_data.loc[:, 'MSSubClass':'SaleCondition'],
             self.test_data.loc[:, 'MSSubClass':'SaleCondition'])
         )
+
+        # 删掉缺失值太多的特征
+        missing_features = ['PoolQC', 'MiscFeature', 'Alley', 'Fence', 'FireplaceQu']
+        all_X.drop(missing_features, axis=1, inplace=True)
+
+        # 删除相同值太多的特征
+        same_value_featrues = ['Street', 'LandSlope', 'LandContour', 'Condition2', 'RoofMatl', 'Heating', 'CentralAir', 'LowQualFinSF', 'BsmtHalfBath', 'KitchenAbvGr', 'Functional', '3SsnPorch', 'PoolArea', 'MiscVal']
+        all_X.drop(same_value_featrues, axis=1, inplace=True)
 
         # 删掉无用特征
         print("delete useless feature")
@@ -78,13 +105,13 @@ class Solution(object):
 
     def gbr(self):
         X_train,  X_test, y_train = self.process_data()
-        gbr_model = GradientBoostingRegressor(learning_rate=0.15, n_estimators=200, max_depth=4, random_state=15)
+        gbr_model = GradientBoostingRegressor(learning_rate=0.1, n_estimators=1000, max_depth=5, random_state=15, loss='huber')
         gbr_model.fit(X_train, y_train)
-        cross_score = np.sqrt(-cross_val_score(gbr_model, X_train, y_train,n_jobs=3, cv=3, scoring='neg_mean_squared_error', verbose=1))
+        cross_score = np.sqrt(-cross_val_score(gbr_model, X_train, y_train,n_jobs=3, cv=5, scoring='neg_mean_squared_error', verbose=1))
         print(cross_score)
         predictions = gbr_model.predict(X_test)
         #print(predictions)
-        #self.write_predictions_2_csv(self.test_data, predictions, "gbr.csv")
+        self.write_predictions_2_csv(self.test_data, predictions, "gbr.csv")
 
     def random_forest_grid_search(self):
         X_train,  X_test, y_train = self.process_data()
@@ -278,8 +305,8 @@ if __name__ == "__main__":
     obj = Solution(dir_name, dir_name + '/train.csv', dir_name + '/test.csv')
     obj.load_data()
     #obj.random_forest()
-    #obj.gbr()
-    obj.data_analyze()
+    obj.gbr()
+    #obj.data_analyze()
 
     #net_obj = MXNetSolution(dir_name, dir_name + '/train.csv', dir_name + '/test.csv')
     #net_obj.process()

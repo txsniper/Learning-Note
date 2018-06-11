@@ -11,8 +11,29 @@ from sklearn.preprocessing import RobustScaler
 from sklearn.linear_model import Lasso
 from sklearn.linear_model import ElasticNet
 from sklearn.kernel_ridge import KernelRidge
+from sklearn.base import BaseEstimator, TransformerMixin, RegressorMixin, clone
 import lightgbm as lgb
 import os
+
+pd.set_option('display.max_columns', 500)
+pd.set_option('display.max_rows', 500)
+
+class AveragingModels(BaseEstimator, RegressorMixin, TransformerMixin):
+    def __init__(self, models):
+        self.models = models
+    
+    def fit(self, X, y):
+        self.models_ = [ clone(x) for x in self.models ]
+        for model in self.models_:
+            model.fit(X, y)
+        return self
+
+    def predict(self, X):
+        predictions = np.column_stack([
+            model.predict(X) for model in self.models_
+        ])
+        return np.mean(predictions, axis=1)
+
 
 class Solution(object):
     def __init__(self, dir_name, train_file, test_file):
@@ -40,8 +61,8 @@ class Solution(object):
     def create_feature(self, data):
         #是否拥有地下室
         hBsmt_index = data.index[data['TotalBsmtSF']>0]
-        data['HaveBsmt'] = 0
-        data.loc[hBsmt_index,'HaveBsmt'] = 1
+        data['HaveBsmt'] = 'NO'
+        data.loc[hBsmt_index,'HaveBsmt'] = 'YES'
         data['house_remod'] = data['YearRemodAdd']-data['YearBuilt']
         data['livingRate'] = (data['GrLivArea']/data['LotArea'])*data['OverallCond']
         data['lot_area'] = data['LotFrontage']/data['GrLivArea']
@@ -74,7 +95,7 @@ class Solution(object):
                 mode = all_X[col].mode()[0]
                 all_X[col].fillna(mode, inplace=True)
 
-         # 数值特征标准化
+        # 数值特征标准化
         print("numeric feature processing")
         numeric_feats = all_X.dtypes[all_X.dtypes != "object"].index
         all_X[numeric_feats] = all_X[numeric_feats].apply(lambda x: ((x - x.mean()) / x.std()))
@@ -84,24 +105,31 @@ class Solution(object):
         print("categorary feature processing")
         all_X = pd.get_dummies(all_X, dummy_na=True)
 
-        #print(all_X.head())
-        #return all_X
+        # 查看NaN数据
+        #print(all_X[all_X['HaveBsmt'].isna()])
+
+        #all_X.loc[all_X['HaveBsmt'].isnull(), 'HaveBsmt'] = 'NO'
+        #all_X.loc[all_X['HaveBsmt'].notnull(), 'HaveBsmt'] = 'YES'
         num_train = self.train_data.shape[0]
         X_train = all_X[:num_train].as_matrix()
         X_test  = all_X[num_train:].as_matrix()
         y_train = self.train_data.SalePrice.as_matrix()
+
+        #print(y_train)
+        #exit(0)
         return X_train, X_test, y_train
 
     
     def rmsle_cv(self, model, X, y):
         n_folds = 5
-        kf = KFold(n_folds, shuffle=True, random_state=41).get_n_splits(X.values)
-        rmse = np.sqrt(-cross_val_score(model, X.values, y, scoring='neg_mean_squared_error', cv=kf))
+        kf = KFold(n_folds, shuffle=True, random_state=41).get_n_splits()
+        rmse = np.sqrt(-cross_val_score(model, X, y, scoring='neg_mean_squared_error', cv=kf, verbose=1, n_jobs=3))
         return rmse
 
+    def rmsle(self, pred, y):
+        return np.sqrt(np.square(np.log(pred+1) - np.log(y+1)).mean())
 
     def run(self):
-        self.load_data()
         X_train, X_test, y_train = self.process_data()
 
         # 模型选择
@@ -168,8 +196,56 @@ class Solution(object):
         score = self.rmsle_cv(model_lgb, X_train, y_train)
         print("LGBM score: {:.4f} ({:.4f})\n".format(score.mean(), score.std()))
 
+        # 几个模型融合
+        stacked_averaged_models = AveragingModels(models=(ENet, GBoost, KRR, lasso))
+        score = self.rmsle_cv(stacked_averaged_models, X_train, y_train)
+        print("Averaged base models score: {:.4f} ({:.4f})\n".format(score.mean(), score.std()))
+        stacked_averaged_models.fit(X_train, y_train)
+        stacked_train_pred = stacked_averaged_models.predict(X_train)
+        stacked_pred = np.expm1(stacked_averaged_models.predict(X_test))
+        print(self.rmsle(stacked_pred, y_train))
+
+        
+
+        model_xgb.fit(X_train, y_train)
+
+
+    def curr_best(self):
+        X_train,  X_test, y_train = self.process_data()
+        print(np.isnan(X_train).sum())
+        exit(0)
+        xgb_model = xgb.XGBRegressor(
+            colsample_bytree=0.5,
+            gamma=0,
+            learning_rate=0.05,
+            max_depth=4,
+            n_estimators=3000,
+            min_child_weight=1.5,
+            reg_alpha=0.6,
+            reg_lambda=0.8,
+            subsample=0.6,
+            random_state=8,
+        )
+        #kf = KFold(5, shuffle=True, random_state=41).get_n_splits()
+        #cross_score = np.sqrt(-cross_val_score(xgb_model, X_train, y_train,n_jobs=3, cv=kf, scoring='neg_mean_squared_error', verbose=1))
+        score = self.rmsle_cv(xgb_model, X_train, y_train)
+        print(score)
+        xgb_model.fit(X_train, y_train)
+        predictions = xgb_model.predict(X_test)
+        #print(predictions)
+        self.write_predictions_2_csv(self.test_data, predictions, "xgb.csv")
+
+    def write_predictions_2_csv(self, test_data,  predictions, csv_name):
+        result = pd.DataFrame({'Id':test_data['Id'].as_matrix(), 'SalePrice':predictions})
+        result.to_csv(self.dir_name + "/" + csv_name, index=False)
+
+
+
+
 
 if __name__ == "__main__":
     dir_name = os.path.dirname(os.path.realpath(__file__))
     obj = Solution(dir_name, dir_name + '/train.csv', dir_name + '/test.csv')
+    obj.load_data()
     obj.run()
+    #obj.curr_best()

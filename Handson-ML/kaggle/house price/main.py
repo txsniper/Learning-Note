@@ -4,8 +4,11 @@ import os
 from sklearn.model_selection import GridSearchCV, RandomizedSearchCV
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.ensemble import GradientBoostingRegressor
-from sklearn.model_selection import cross_val_score
+from sklearn.model_selection import cross_val_score, KFold
 from sklearn.utils import shuffle
+import xgboost as xgb
+import seaborn as sns 
+from scipy import stats
 
 pd.set_option('display.max_columns', None)
 
@@ -34,7 +37,11 @@ class Solution(object):
 
         # 检查特征间的相关系数 
         train_corr = self.train_data.drop('Id',axis=1).corr()
-        print(train_corr['SalePrice'])
+        #print(train_corr['SalePrice'])
+        a = plt.subplots(figsize=(40, 30))
+        a = sns.heatmap(train_corr, vmax=0.8, square=True)# annot=True)
+        plt.show()
+
 
         # 检查缺失值
         # isnull对每个元素判断是否为空, 用 True/False 填充结果矩阵
@@ -43,10 +50,10 @@ class Solution(object):
         total = all_data.isnull().sum().sort_values(ascending=False)
         percent = (all_data.isnull().sum() / all_data.isnull().count()).sort_values(ascending=False)
         missing_data = pd.concat([total, percent], axis=1, keys=['Total','Lost Percent'])
-        print(missing_data)
+        #print(missing_data)
         #print(missing_data[missing_data.isnull().values==False].sort_values('Total', axis=0, ascending=False).head(20))
 
-        self.print_value_counts(all_data)
+        #self.print_value_counts(all_data)
 
 
 
@@ -61,12 +68,31 @@ class Solution(object):
         all_X.drop(missing_features, axis=1, inplace=True)
 
         # 删除相同值太多的特征
-        same_value_featrues = ['Street', 'LandSlope', 'LandContour', 'Condition2', 'RoofMatl', 'Heating', 'CentralAir', 'LowQualFinSF', 'BsmtHalfBath', 'KitchenAbvGr', 'Functional', '3SsnPorch', 'PoolArea', 'MiscVal']
-        all_X.drop(same_value_featrues, axis=1, inplace=True)
+        same_value_featrues = ['Street', 'LandSlope', 'LandContour', 'Condition2', 
+            'RoofMatl', 'Heating', 'CentralAir', 'LowQualFinSF', 'BsmtHalfBath', 
+            'KitchenAbvGr', 'Functional', '3SsnPorch', 'PoolArea', 'MiscVal'
+        ]
+        #all_X.drop(same_value_featrues, axis=1, inplace=True)
 
         # 删掉无用特征
-        print("delete useless feature")
-        all_X.drop(['Utilities'], axis=1, inplace=True)
+        #print("delete useless feature")
+        #all_X.drop(['Utilities'], axis=1, inplace=True)
+
+        # 创造新的特征
+        all_X['house_remod'] = all_X['YearRemodAdd'] - all_X['YearBuilt']
+        all_X['room_area'] = all_X['TotRmsAbvGrd'] / all_X['GrLivArea']
+        all_X['fu_room'] = all_X['FullBath'] / all_X['TotRmsAbvGrd']
+        all_X['gr_room'] = all_X['BedroomAbvGr'] / all_X['TotRmsAbvGrd']
+
+        # 填充缺失值
+        na_col = all_X.dtypes[all_X.isnull().any()]
+        for col in na_col.index:
+            if na_col[col] != 'object':
+                med = all_X[col].median()
+                all_X[col].fillna(med, inplace=True)
+            else:
+                mode = all_X[col].mode()[0]
+                all_X[col].fillna(mode, inplace=True)
 
         # 数值特征标准化
         print("numeric feature processing")
@@ -78,9 +104,7 @@ class Solution(object):
         print("categorary feature processing")
         all_X = pd.get_dummies(all_X, dummy_na=True)
 
-        # 平均值填充缺失值
-        all_X = all_X.fillna(all_X.mean())
-
+        
         #print(all_X.head())
         #return all_X
         num_train = self.train_data.shape[0]
@@ -112,6 +136,55 @@ class Solution(object):
         predictions = gbr_model.predict(X_test)
         #print(predictions)
         self.write_predictions_2_csv(self.test_data, predictions, "gbr.csv")
+
+    def rmsle_cv(self, model, X, y):
+        n_folds = 5
+        kf = KFold(n_folds, shuffle=True, random_state=41).get_n_splits(train.values)
+        rmse = np.sqrt(-cross_val_score(model, X.values, y, scoring='neg_mean_squared_error', cv=kf))
+        return rmse
+
+    def curr_best(self):
+        X_train,  X_test, y_train = self.process_data()
+        xgb_model = xgb.XGBRegressor(
+            colsample_bytree=0.5,
+            gamma=0,
+            learning_rate=0.05,
+            max_depth=4,
+            n_estimators=3000,
+            min_child_weight=1.5,
+            reg_alpha=0.6,
+            reg_lambda=0.8,
+            subsample=0.6,
+            random_state=8,
+        )
+        xgb_model.fit(X_train, y_train)
+        cross_score = np.sqrt(-cross_val_score(xgb_model, X_train, y_train,n_jobs=3, cv=5, scoring='neg_mean_squared_error', verbose=1))
+        print(cross_score)
+        predictions = xgb_model.predict(X_test)
+        #print(predictions)
+        self.write_predictions_2_csv(self.test_data, predictions, "xgb.csv")
+    
+    def xgb_grid_search(self):
+        X_train,  X_test, y_train = self.process_data()
+        xgb_model = xgb.XGBRegressor(
+            colsample_bytree=0.5,
+            gamma=0,
+            learning_rate=0.05,
+            max_depth=4,
+            n_estimators=3000,
+            min_child_weight=1.5,
+            reg_alpha=0.6,
+            reg_lambda=0.8,
+            subsample=0.6,
+            random_state=8,
+        )
+        xgb_model.fit(X_train, y_train)
+        cross_score = np.sqrt(-cross_val_score(xgb_model, X_train, y_train,n_jobs=3, cv=5, scoring='neg_mean_squared_error', verbose=1))
+        print(cross_score)
+        predictions = xgb_model.predict(X_test)
+        #print(predictions)
+        self.write_predictions_2_csv(self.test_data, predictions, "xgb.csv")
+
 
     def random_forest_grid_search(self):
         X_train,  X_test, y_train = self.process_data()
@@ -304,8 +377,9 @@ if __name__ == "__main__":
     dir_name = os.path.dirname(os.path.realpath(__file__))
     obj = Solution(dir_name, dir_name + '/train.csv', dir_name + '/test.csv')
     obj.load_data()
+    obj.xgb_grid_search()
     #obj.random_forest()
-    obj.gbr()
+    #obj.gbr()
     #obj.data_analyze()
 
     #net_obj = MXNetSolution(dir_name, dir_name + '/train.csv', dir_name + '/test.csv')

@@ -202,30 +202,33 @@ class Solution(object):
         print("Averaged base models score: {:.4f} ({:.4f})\n".format(score.mean(), score.std()))
         stacked_averaged_models.fit(X_train, y_train)
         stacked_train_pred = stacked_averaged_models.predict(X_train)
-        stacked_pred = np.expm1(stacked_averaged_models.predict(X_test))
-        print(self.rmsle(stacked_pred, y_train))
+        #stacked_pred = np.expm1(stacked_averaged_models.predict(X_test))
+        stacked_pred = stacked_averaged_models.predict(X_test)
+        print(self.rmsle(stacked_train_pred, y_train))
 
         # xgboost
         model_xgb.fit(X_train, y_train)
         xgb_train_pred = model_xgb.predict(X_train)
-        xgb_pred = np.expm1(model_xgb.predict(X_test))
+        #xgb_pred = np.expm1(model_xgb.predict(X_test))
+        xgb_pred = model_xgb.predict(X_test)
         print(self.rmsle(xgb_train_pred, y_train))
         
         # lightGBM
         model_lgb.fit(X_train, y_train)
         lgb_train_pred = model_lgb.predict(X_train)
-        lgb_pred = np.expm1(model_lgb.predict(X_test))
+        #lgb_pred = np.expm1(model_lgb.predict(X_test))
+        lgb_pred = model_lgb.predict(X_test)
         print(self.rmsle(lgb_train_pred, y_train))
         '''RMSE on the entire Train data when averaging'''
 
         print('RMSLE score on train data:')
 
         # 融合方式: 加权平均
-        print(self.rmsle(stacked_train_pred * 0.70 + xgb_train_pred * 0.15 +
-                    lgb_train_pred * 0.15, y_train))
+        print(self.rmsle(stacked_train_pred * 0.1 + xgb_train_pred * 0.6 +
+                    lgb_train_pred * 0.3, y_train))
 
         # 模型融合的预测效果
-        ensemble = stacked_pred * 0.70 + xgb_pred * 0.15 + lgb_pred * 0.15
+        ensemble = stacked_pred * 0.1 + xgb_pred * 0.6 + lgb_pred * 0.3
 
         self.write_predictions_2_csv(self.test_data, ensemble, "ensemble.csv")
         

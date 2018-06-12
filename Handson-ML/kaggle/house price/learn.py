@@ -12,6 +12,7 @@ from sklearn.linear_model import Lasso
 from sklearn.linear_model import ElasticNet
 from sklearn.kernel_ridge import KernelRidge
 from sklearn.base import BaseEstimator, TransformerMixin, RegressorMixin, clone
+from sklearn.learning_curve import validation_curve
 import lightgbm as lgb
 import os
 
@@ -108,8 +109,6 @@ class Solution(object):
         # 查看NaN数据
         #print(all_X[all_X['HaveBsmt'].isna()])
 
-        #all_X.loc[all_X['HaveBsmt'].isnull(), 'HaveBsmt'] = 'NO'
-        #all_X.loc[all_X['HaveBsmt'].notnull(), 'HaveBsmt'] = 'YES'
         num_train = self.train_data.shape[0]
         X_train = all_X[:num_train].as_matrix()
         X_test  = all_X[num_train:].as_matrix()
@@ -123,7 +122,7 @@ class Solution(object):
     def rmsle_cv(self, model, X, y):
         n_folds = 5
         kf = KFold(n_folds, shuffle=True, random_state=41).get_n_splits()
-        rmse = np.sqrt(-cross_val_score(model, X, y, scoring='neg_mean_squared_error', cv=kf, verbose=1, n_jobs=3))
+        rmse = np.sqrt(-cross_val_score(model, X, y, scoring='neg_mean_squared_error', cv=kf, verbose=1, n_jobs=4))
         return rmse
 
     def rmsle(self, pred, y):
@@ -224,26 +223,89 @@ class Solution(object):
         print('RMSLE score on train data:')
 
         # 融合方式: 加权平均
-        print(self.rmsle(stacked_train_pred * 0.1 + xgb_train_pred * 0.6 +
-                    lgb_train_pred * 0.3, y_train))
+        print(self.rmsle(stacked_train_pred * 0.25 + xgb_train_pred * 0.3 +
+                    lgb_train_pred * 0.45, y_train))
 
         # 模型融合的预测效果
-        ensemble = stacked_pred * 0.1 + xgb_pred * 0.6 + lgb_pred * 0.3
+        ensemble = stacked_pred * 0.25 + xgb_pred * 0.3 + lgb_pred * 0.45
 
         self.write_predictions_2_csv(self.test_data, ensemble, "ensemble.csv")
-        
 
-    def curr_best(self):
+    def grid_search_cv(self, model, param, X_train, y_train):
+        grid_model = GridSearchCV(estimator=model, 
+            param_grid=param, 
+            scoring='neg_mean_squared_error',
+            cv=5,
+            verbose=1,
+            n_jobs=4
+        )
+        grid_model.fit(X_train, y_train)
+        evalute_res = grid_model.cv_results_
+        for mean_score, params in zip(evalute_res['mean_test_score'], evalute_res['params']):
+            print(np.sqrt(-mean_score), params)
+        
+        print('best param: {0}'.format(grid_model.best_params_))
+        print('best model score: {0}'.format(np.sqrt(-grid_model.best_score_)))
+
+    def lightgbm_gird_search(self):
         X_train,  X_test, y_train = self.process_data()
-        print(np.isnan(X_train).sum())
-        exit(0)
+        cv_params = {
+
+        }
+        other_params = {
+
+        }
+        model_lgb = lgb.LGBMRegressor(
+            objective='regression',
+            num_leaves=5,
+            learning_rate=0.05,
+            n_estimators=720,
+            max_bin=55,
+            bagging_fraction=0.8,
+            bagging_freq=5,
+            feature_fraction=0.2319,
+            feature_fraction_seed=9,
+            bagging_seed=9,
+            min_data_in_leaf=6,
+            min_sum_hessian_in_leaf=11)
+    
+    def xgb_grid_search(self):
+        X_train,  X_test, y_train = self.process_data()
+        cv_params = {
+            #'n_estimators': [2000, 2500, 3000],
+            #'max_depth' : [3,4,5,6],
+            #'learning_rate' : [0.03, 0.04, 0.05]
+            #'min_child_weight' : [0.5, 1.0, 1.5, 2.0],
+            #'subsample': [0.5, 0.6, 0.7],
+            #'colsample_bytree': [0.4, 0.5, 0.6, 0.7],
+            #'reg_alpha' : [0.5, 0.6, 0.7],
+            #'reg_lambda' : [0.5, 0.6, 0.7, 0.8, 0.9],
+            'gamma' : [0.1, 0.2, 0.15],
+            
+        }
+        other_params = {
+            'learning_rate' : 0.05,
+            'n_estimators' : 2000,
+            'max_depth' : 4,
+            'min_child_weight' : 1.5,
+            'subsample' : 0.7,
+            'colsample_bytree' : 0.6,
+            'gamma' : 0,
+            'reg_alpha' : 0.6,
+            'reg_lambda' : 0.8,
+        }
+        xgb_model = xgb.XGBRegressor(**other_params)
+        self.grid_search_cv(xgb_model, cv_params, X_train, y_train)
+
+    def xgb_regressor(self):
+        X_train,  X_test, y_train = self.process_data()
         xgb_model = xgb.XGBRegressor(
-            colsample_bytree=0.5,
-            gamma=0,
+            colsample_bytree=0.4,
+            gamma=0.1,
             learning_rate=0.05,
             max_depth=4,
             n_estimators=3000,
-            min_child_weight=1.5,
+            min_child_weight=2,
             reg_alpha=0.6,
             reg_lambda=0.8,
             subsample=0.6,
@@ -252,10 +314,10 @@ class Solution(object):
         #kf = KFold(5, shuffle=True, random_state=41).get_n_splits()
         #cross_score = np.sqrt(-cross_val_score(xgb_model, X_train, y_train,n_jobs=3, cv=kf, scoring='neg_mean_squared_error', verbose=1))
         score = self.rmsle_cv(xgb_model, X_train, y_train)
-        print(score)
+
+        print("Xgboost score: {:.4f} ({:.4f})\n".format(score.mean(), score.std()))
         xgb_model.fit(X_train, y_train)
         predictions = xgb_model.predict(X_test)
-        #print(predictions)
         self.write_predictions_2_csv(self.test_data, predictions, "xgb.csv")
 
     def write_predictions_2_csv(self, test_data,  predictions, csv_name):
@@ -263,12 +325,10 @@ class Solution(object):
         result.to_csv(self.dir_name + "/" + csv_name, index=False)
 
 
-
-
-
 if __name__ == "__main__":
     dir_name = os.path.dirname(os.path.realpath(__file__))
     obj = Solution(dir_name, dir_name + '/train.csv', dir_name + '/test.csv')
     obj.load_data()
-    obj.run()
-    #obj.curr_best()
+    #obj.run()
+    #obj.xgb_regressor()
+    obj.xgb_grid_search()

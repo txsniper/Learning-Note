@@ -139,8 +139,8 @@ class Solution(object):
 
     def rmsle_cv(self, model, X, y):
         n_folds = 5
-        kf = KFold(n_folds, shuffle=True, random_state=41).get_n_splits(train.values)
-        rmse = np.sqrt(-cross_val_score(model, X.values, y, scoring='neg_mean_squared_error', cv=kf))
+        kf = KFold(n_folds, shuffle=True, random_state=41).get_n_splits(X)
+        rmse = np.sqrt(-cross_val_score(model, X, y, scoring='neg_mean_squared_error', cv=kf))
         return rmse
 
     def curr_best(self):

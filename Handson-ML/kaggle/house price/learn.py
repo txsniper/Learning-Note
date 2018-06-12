@@ -251,24 +251,26 @@ class Solution(object):
     def lightgbm_gird_search(self):
         X_train,  X_test, y_train = self.process_data()
         cv_params = {
-
+            'n_estimators' : [500, 700, 900, 1000, 1300]
         }
         other_params = {
-
+            'objective'     : 'regression',
+            'num_leaves'    : 5,
+            'learning_rate' : 0.05,
+            'n_estimators'  : 1000,
+            'max_bin'       : 55,
+            'bagging_fraction' : 0.8,
+            'bagging_freq'  : 5,
+            'feature_fraction' : 0.23,
+            'feature_fraction_seed' : 9,
+            'bagging_seed'  : 9,
+            'min_data_in_leaf'  : 6,
+            'min_sum_hessian_in_leaf' : 11,
         }
         model_lgb = lgb.LGBMRegressor(
-            objective='regression',
-            num_leaves=5,
-            learning_rate=0.05,
-            n_estimators=720,
-            max_bin=55,
-            bagging_fraction=0.8,
-            bagging_freq=5,
-            feature_fraction=0.2319,
-            feature_fraction_seed=9,
-            bagging_seed=9,
-            min_data_in_leaf=6,
-            min_sum_hessian_in_leaf=11)
+            **other_params
+        )
+        self.grid_search_cv(model_lgb, cv_params, X_train, y_train)
     
     def xgb_grid_search(self):
         X_train,  X_test, y_train = self.process_data()

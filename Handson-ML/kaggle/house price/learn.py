@@ -108,11 +108,12 @@ class Solution(object):
 
         # 查看NaN数据
         #print(all_X[all_X['HaveBsmt'].isna()])
+        self.feature_list = all_X.columns
 
         num_train = self.train_data.shape[0]
-        X_train = all_X[:num_train].as_matrix()
-        X_test  = all_X[num_train:].as_matrix()
-        y_train = self.train_data.SalePrice.as_matrix()
+        X_train = all_X[:num_train].values
+        X_test  = all_X[num_train:].values
+        y_train = self.train_data.SalePrice.values
 
         #print(y_train)
         #exit(0)
@@ -120,7 +121,7 @@ class Solution(object):
 
     
     def rmsle_cv(self, model, X, y):
-        n_folds = 5
+        n_folds = 3
         kf = KFold(n_folds, shuffle=True, random_state=41).get_n_splits()
         rmse = np.sqrt(-cross_val_score(model, X, y, scoring='neg_mean_squared_error', cv=kf, verbose=1, n_jobs=4))
         return rmse
@@ -313,11 +314,21 @@ class Solution(object):
         )
         #kf = KFold(5, shuffle=True, random_state=41).get_n_splits()
         #cross_score = np.sqrt(-cross_val_score(xgb_model, X_train, y_train,n_jobs=3, cv=kf, scoring='neg_mean_squared_error', verbose=1))
-        score = self.rmsle_cv(xgb_model, X_train, y_train)
 
+        score = self.rmsle_cv(xgb_model, X_train, y_train)
         print("Xgboost score: {:.4f} ({:.4f})\n".format(score.mean(), score.std()))
         xgb_model.fit(X_train, y_train)
+
         predictions = xgb_model.predict(X_test)
+        important = xgb_model.feature_importances_
+        feature_imp_dict = {}
+        for feature_name, feature_imp in zip(self.feature_list, important):
+            feature_imp_dict[feature_name] = feature_imp
+        
+        feature_imp_dict = sorted(feature_imp_dict.items(), key=lambda d:d[1], reverse=True)
+        for key, value in feature_imp_dict:
+            print(key + ": " + str(value))
+    
         self.write_predictions_2_csv(self.test_data, predictions, "xgb.csv")
 
     def write_predictions_2_csv(self, test_data,  predictions, csv_name):
@@ -330,5 +341,5 @@ if __name__ == "__main__":
     obj = Solution(dir_name, dir_name + '/train.csv', dir_name + '/test.csv')
     obj.load_data()
     #obj.run()
-    #obj.xgb_regressor()
-    obj.xgb_grid_search()
+    obj.xgb_regressor()
+    #obj.xgb_grid_search()

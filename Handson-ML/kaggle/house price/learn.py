@@ -121,7 +121,7 @@ class Solution(object):
 
     
     def rmsle_cv(self, model, X, y):
-        n_folds = 3
+        n_folds = 5
         kf = KFold(n_folds, shuffle=True, random_state=41).get_n_splits()
         rmse = np.sqrt(-cross_val_score(model, X, y, scoring='neg_mean_squared_error', cv=kf, verbose=1, n_jobs=4))
         return rmse
@@ -251,21 +251,31 @@ class Solution(object):
     def lightgbm_gird_search(self):
         X_train,  X_test, y_train = self.process_data()
         cv_params = {
-            'n_estimators' : [500, 700, 900, 1000, 1300]
+            #'n_estimators' : [2000, 2500, 3000, 3500],
+            #'bagging_fraction' : [0.4, 0.5, 0.6]
+            #'feature_fraction' : [0.2, 0.3, 0.4, 0.5, 0.6]
+            #'lambda_l1' : [0.5, 0.6, 0.7, 0.8, 0.9, 1]
+            #'lambda_l2' : [0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1]
+            #'learning_rate' : [0.03, 0.05, 0.07, 0.1, 0.12, 0.15]
+            #'num_leaves' : [8, 12, 16, 24, 32]
+            #'mean_data_in_leaf' : [4, 6, 8, 10]
+            #'max_bin' : [40, 60, 80, 100, 150]
         }
         other_params = {
             'objective'     : 'regression',
-            'num_leaves'    : 5,
+            'num_leaves'    : 12,
             'learning_rate' : 0.05,
-            'n_estimators'  : 1000,
-            'max_bin'       : 55,
-            'bagging_fraction' : 0.8,
+            'n_estimators'  : 3000,
+            'max_bin'       : 60,
+            'bagging_fraction' : 0.5,
             'bagging_freq'  : 5,
-            'feature_fraction' : 0.23,
+            'feature_fraction' : 0.3,
             'feature_fraction_seed' : 9,
             'bagging_seed'  : 9,
             'min_data_in_leaf'  : 6,
             'min_sum_hessian_in_leaf' : 11,
+            'lambda_l1' : 0.7,
+            'lambda_l2' : 0.4,
         }
         model_lgb = lgb.LGBMRegressor(
             **other_params
@@ -283,7 +293,7 @@ class Solution(object):
             #'colsample_bytree': [0.4, 0.5, 0.6, 0.7],
             #'reg_alpha' : [0.5, 0.6, 0.7],
             #'reg_lambda' : [0.5, 0.6, 0.7, 0.8, 0.9],
-            'gamma' : [0.1, 0.2, 0.15],
+            #'gamma' : [0.1, 0.2, 0.15],
             
         }
         other_params = {
@@ -343,5 +353,6 @@ if __name__ == "__main__":
     obj = Solution(dir_name, dir_name + '/train.csv', dir_name + '/test.csv')
     obj.load_data()
     #obj.run()
-    obj.xgb_regressor()
+    #obj.xgb_regressor()
     #obj.xgb_grid_search()
+    obj.lightgbm_gird_search()

@@ -8,6 +8,7 @@ fc = open("../fc","w")
 d = {}
 count = 0
 line = f.readline()
+# 统计除时间外其他特征出现的次数(只保留出现10次及以上的)，每个特征使用不同的name用来防止不同特征含有相同值导致重复
 while True:
     line = f.readline()
     if not line:

@@ -15,8 +15,12 @@ def stat(input,isTest):
         index = 11
         if isTest:
             index = 10
+        # index : device_id
         id = "i_"+lis[index]
+        # ip
         ip = "j_" + lis[index+1]
+
+        # addc中生成的 id
         iid = "v_" + lis[len(lis)-7]
         if id in d:
             d[id] += 1
@@ -43,4 +47,5 @@ for k in d:
     if d[k] <=10:
         rare_d[k] = d[k]
 
+# 将出现次数小于10的id保存到文件中
 marshal.dump(rare_d,open("../rare_d","w"))

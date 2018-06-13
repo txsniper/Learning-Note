@@ -44,14 +44,24 @@ def run(input,output,isTest):
 			del dh
 			dh = defaultdict(int)
 			hour = lis[date_idx][6:]
+		
+		# 这里还没懂
 		time = int(lis[date_idx][6:]) * 60 + int(int(lis[0][:5]) / 100000. * 60)
+
+		# device_id用 ip + model代替
 		id = get_id("i_"+lis[date_idx+9],"j_"+lis[date_idx+10],"k_"+lis[date_idx+11])
+
+		# 用户id 与 C14 和 C17 构成组合特征, 组合情况下出现的次数
+		# C14 : 推测是 ad id
+		# C17 : 推测是 group id
+		# C21 : 推测是 ad sponsor id
 		d[id + "_n_" + lis[date_idx+14]] += 1
 		d[id + "_q_" + lis[date_idx+17]] += 1
 		dh[id + "_n_" + lis[date_idx+14]] += 1
 		dh[id + "_q_" + lis[date_idx+17]] += 1
 		dh[id] += 1
 		
+		# 如果app_id是"ecad2386", 则使用 site_id代替
 		media_id = "f_"+lis[date_idx+6]
 		if lis[date_idx+6] == "ecad2386":
 			media_id = "c_"+lis[date_idx+3]

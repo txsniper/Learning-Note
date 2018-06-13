@@ -15,6 +15,8 @@ def stat(input):
         # identical id
         index = len(lis)-7
         iid = "v_"+lis[index]
+        # iid 出现的次数
+        # 用户id (addc中生成)
         if iid in d_id:
             d_id[iid] += 1
         else:
@@ -26,7 +28,7 @@ def stat(input):
             d_id[ip] += 1
         else:
             d_id[ip] = 1
-        # id
+        # device_id
         index = len(lis)-20
         id = "i_"+lis[index]
         if id in d_id:

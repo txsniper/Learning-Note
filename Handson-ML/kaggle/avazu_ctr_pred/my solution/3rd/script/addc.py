@@ -67,8 +67,19 @@ class Addc(object):
         
         cols_name = []
         line_count = 0
-        feature_dict = defaultdict(int)
-        feature_dict_1 = defaultdict(int)
+
+        # 按天编号: 用户id与广告id的组合
+        id_day_impression = defaultdict(int)
+
+        # 按小时编号： 用户id与广告id的组合
+        id_hour_impression = defaultdict(int)
+
+        # 同一天内访问的时间间隔
+        id_last_visit_time_interval = {}
+
+        last_day = "??"
+        last_hour = "??"
+
         with open(input) as f_in:
             for line in f_in:
                 line = line.strip()
@@ -119,43 +130,67 @@ class Addc(object):
                 day   = date[4:6]
                 hour = date[6:]
 
+                # 从新的一天开始编号
+                if day != last_day:
+                    id_day_impression = defaultdict(int)
+                    last_day = day
+                    id_last_visit_time_interval = {}
+                
+                # 从新的一小时开始编号
+                if hour != last_hour:
+                    id_hour_impression = defaultdict(int)
+                    last_hour = hour
+                
+                curr_time = int(hour) * 60
+
                 id = self.get_id("i#" + device_id, "j#" + device_ip, "k#" + device_model)
                 id_C14 = id + "_" + "n#" + C14
                 id_C17 = id + "_" + "q#" + C17
-                feature_dict[id_C14] += 1
-                feature_dict[id_C17] += 1
 
-                feature_dict_1[id_C14] += 1
-                feature_dict_1[id_C17] += 1
-                feature_dict_1[id] += 1
+                # 按天编号
+                id_day_impression[id_C14] += 1
+                id_day_impression[id_C17] += 1
+
+                # 按小时编号
+                id_hour_impression[id_C14] += 1
+                id_hour_impression[id_C17] += 1
+                id_hour_impression[id] += 1
 
                 median_id = "f#" + app_id
                 if app_id == "ecad2386":
                     median_id = "c#" + site_id
                 
-                feature_dict[id + "_" + median_id] += 1
+                id_day_impression[id + "_" + median_id] += 1
 
-                m  = feature_dict[id + "_" + median_id]
-                c  = feature_dict[id_C14]
-                c2 = feature_dict[id_C17]
+                t = "-1"
+                if id not in id_last_visit_time_interval:
+                    id_last_visit_time_interval[id] = curr_time
+                else:
+                    t = str(curr_time - id_last_visit_time_interval[id])
+                    id_last_visit_time_interval[id] = curr_time
 
-                ch = feature_dict_1[id_C14]
-                ch1 = feature_dict_1[id_C17]
-                ch2 = feature_dict_1[id]
+                m  = id_day_impression[id + "_" + median_id]
+                c  = id_day_impression[id_C14]
+                c2 = id_day_impression[id_C17]
 
+                ch  = id_hour_impression[id_C14]
+                ch1 = id_hour_impression[id_C17]
+                ch2 = id_hour_impression[id]
 
+                out_line = line[:-2] + "," + id + "," + str(m) + "," + str(ch1) + "," + str(ch2) + "," + str(c) + "," + str(c2) + "," + t
+                f_out.write(out_line + "\n")
+        f_out.close()
 
-
-
-
-
-
-
-
-
-
-
+        
     def run(self):
         self.process_data(self.train_in, self.train_out, False)
         self.process_data(self.test_in,  self.test_out,  True)
 
+
+if __name__ == "__main__":
+    train_in = "./data_in/train"
+    test_in = "./data_in/test"
+    train_out = "./data_out/train_c"
+    test_out = "./data_out/test_c"
+    obj = Addc(train_in, test_in, train_out, test_out)
+    obj.run()

@@ -22,10 +22,9 @@ class Fcount(object):
             count += 1
             if count % 100000 == 0:
                 print("line count : " + str(count))
-            
-            parts = line[:-2].split(",")
+            parts = line.split(",")
             for i in range(start_pos, len(parts)):
-                prefix = chr(ord('a') + i - 3)
+                prefix = chr(ord('a') + i - start_pos)
                 feature = prefix + "#" + parts[i]
                 if feature in dic:
                     dic[feature] += 1
@@ -37,7 +36,7 @@ class Fcount(object):
         dic = {}
         dic = self.process_file(self.train_in, dic, False)
         dic = self.process_file(self.test_in, dic, True)
-        f_out = open(self.file_out, "w")
+        f_out = open(self.file_out, "wb")
 
         s = []
         for feature in dic:

@@ -8,7 +8,7 @@ class Addc(object):
         self.train_out  = train_out
         self.test_out   = test_out
         self.col_idx = {
-            'hour' : 0
+            'hour' : 0,
             'C1' : 1,
             'banner_pos' : 2,
             'site_id' : 3,
@@ -32,7 +32,7 @@ class Addc(object):
             'C21' : 21,
         }
         self.idx_col = {}
-        for key, value in self.col_idx:
+        for key, value in self.col_idx.items():
             self.idx_col[value] = key
 
         self.feature_prefix = {
@@ -56,7 +56,7 @@ class Addc(object):
     # 利用device_id来标识用户，如果device_id是"a99f214a"，
     # 则使用 dev_ip + dev_model 组合
     def get_id(self, dev_id, dev_ip, dev_model):
-        if dev_id != 'a99f214a':
+        if dev_id != 'i#a99f214a':
             return dev_id
         else:
             return dev_ip + "_" + dev_model
@@ -87,7 +87,7 @@ class Addc(object):
                     break
                 line_count += 1
                 if line_count == 1:
-                    f_out.write(line[:-2] + ",C22,C23,C24,C25,C26,C27,C28\n")
+                    f_out.write(line + ",C22,C23,C24,C25,C26,C27,C28\n")
                 if line_count % 100000 == 0:
                     print("line count : " + str(line_count))
                 parts = line.split(",")
@@ -177,7 +177,7 @@ class Addc(object):
                 ch1 = id_hour_impression[id_C17]
                 ch2 = id_hour_impression[id]
 
-                out_line = line[:-2] + "," + id + "," + str(m) + "," + str(ch1) + "," + str(ch2) + "," + str(c) + "," + str(c2) + "," + t
+                out_line = line + "," + id + "," + str(m) + "," + str(ch1) + "," + str(ch2) + "," + str(c) + "," + str(c2) + "," + t
                 f_out.write(out_line + "\n")
         f_out.close()
 

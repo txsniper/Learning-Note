@@ -15,7 +15,7 @@ class IdDay(object):
         for k in dic:
             d_set[k] = len(dic[k])
         
-        marshal.dump(d_set, open(self.file_out, "w"))
+        marshal.dump(d_set, open(self.file_out, "wb"))
 
 
     def process_file(self, file_in, dic, isTest):
@@ -57,7 +57,8 @@ class IdDay(object):
                 s = set()
                 s.add(day)
                 dic[iid] = s
-        f_in.close()     
+        f_in.close()
+        return dic
 
 
 if __name__ == "__main__":

@@ -45,7 +45,7 @@ class Rare(object):
             if dic[id] <= 10:
                 rare_d[id] = dic[id]
 
-        marshal.dump(rare_d, open(self.file_out, "w"))
+        marshal.dump(rare_d, open(self.file_out, "wb"))
 
 
 if __name__ == "__main__":

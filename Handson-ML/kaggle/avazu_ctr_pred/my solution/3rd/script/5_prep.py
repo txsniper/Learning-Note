@@ -4,9 +4,9 @@ class Prep(object):
     def __init__(self):
         pass
     def process(self, train_in, test_in, train_out, test_out, fc_file, rare_file, id_day_file):
-        fc_in = marshal.load(open(fc_file))
-        rare_in = marshal.load(open(rare_file))
-        id_day_in = marshal.load(open(id_day_file))
+        fc_in = marshal.load(open(fc_file, "rb"))
+        rare_in = marshal.load(open(rare_file, "rb"))
+        id_day_in = marshal.load(open(id_day_file, "rb"))
         self.process_one_file(fc_in, rare_in, id_day_in, train_in, train_out, False)
         self.process_one_file(fc_in, rare_in, id_day_in, test_in, test_out, True)
     
@@ -36,13 +36,13 @@ class Prep(object):
             if count % 100000 == 0:
                 print("line count : " + str(count))
             parts = line.split(",")
-            uid = "???
+            uid = "???"
             for i in range(C1_idx, len(parts)):
                 prefix = chr(ord('a') + i - C1_idx)
 
                 # device_ip
                 if prefix == "j":
-                    parts[i] = self.get_rare_data(prefix, parts[i], rare_in)
+                    #parts[i] = self.get_rare_data(prefix, parts[i], rare_in)
                     ip = prefix + "#" + parts[i]
                     rare = rare_in.get(ip)
                     if rare != None:
@@ -60,6 +60,7 @@ class Prep(object):
                 # addc中用户的复合id
                 if prefix == 'v':
                     id = prefix + "#" + parts[i]
+                    uid = id
                     rare = rare_in.get(id)
                     if rare != None:
                         parts[i] = "v_rare_" + str(rare)
@@ -73,7 +74,7 @@ class Prep(object):
                     parts[i] = prefix + "_rare"
                 else:
                     parts[i] = prefix + "#" + parts[i]
-            parts.append("id_day_" + str(id_day_in[id]))
+            parts.append("id_day_" + str(id_day_in[uid]))
             f_out.write(",".join(parts) + "\n")
         f_in.close()
         f_out.close()

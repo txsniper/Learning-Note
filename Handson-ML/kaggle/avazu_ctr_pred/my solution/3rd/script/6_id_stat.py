@@ -22,7 +22,7 @@ class IdStat(object):
                 break
             count += 1
             if count % 100000 == 0:
-                print("line count : " + str(count) + "\n")
+                print("line count : " + str(count))
             parts = line.split(",")
             # id
             id_idx = len(parts) - 7
@@ -41,7 +41,7 @@ class IdStat(object):
         dic = {}
         dic = self.process(train_in, dic, False)
         dic = self.process(test_in, dic, True)
-        marshal.dump(dic, open(file_out, "w"))
+        marshal.dump(dic, open(file_out, "wb"))
 
 if __name__ == "__main__":
     train_in = "./data_out/train_c"

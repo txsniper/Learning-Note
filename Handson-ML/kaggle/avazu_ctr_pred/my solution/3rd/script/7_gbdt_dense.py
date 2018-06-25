@@ -8,7 +8,6 @@ class GbdtDense(object):
         self.test_dense_out = test_dense_out
 
     def process(self, file_in, file_out, id_stat, isTest):
-        
         f_in = open(file_in)
         f_out = open(file_out, "w")
         line = f_in.readline()
@@ -38,11 +37,9 @@ class GbdtDense(object):
                 # device_ip
                 if i == len(parts) - 19:
                     cur_x.append(id_stat["j#" + parts[i]])
-                
                 # device_id
                 elif i == len(parts) - 20:
                     continue
-                
                 # user id
                 elif i == len(parts) - 7:
                     cur_x.append(id_stat["v#" + parts[i]])
@@ -59,7 +56,7 @@ class GbdtDense(object):
 
     def run(self, id_stat_file):
         start_time = datetime.now()
-        id_stat = marshal.load(open(id_stat_file))
+        id_stat = marshal.load(open(id_stat_file, "rb"))
         self.process(self.train_in, self.train_dense_out, id_stat, False)
         self.process(self.test_in, self.test_dense_out, id_stat, True)
         end_time = datetime.now()

@@ -18,3 +18,4 @@ pypy 5_prep.py
 # step6: 统计id, ip, 出现的次数
 pypy 6_id_stat.py
 # step7: 生成gbdt的特征
+pypy 7_gbdt_dense.py

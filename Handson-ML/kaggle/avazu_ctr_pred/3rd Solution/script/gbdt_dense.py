@@ -23,6 +23,8 @@ def load_name_sample(input,isTest):
         if not line :
             break
         fields = line.split(',')
+
+        # 训练集
         if isTest == False:
             label = int(fields[1])
             if label == 0:
@@ -31,17 +33,24 @@ def load_name_sample(input,isTest):
             if isValid==False:
                 if int(fields[2][4:6]) > 28:
                     isValid = True
+        # 测试集
         else:
             y.append(-1)
      
         cur_x = []
         for i in xrange(index,len(fields)):
+
+            # device_ip
             if i == len(fields)-19:
                 cur_x.append(id_stat["j_"+fields[i]])
                 #continue
+            
+            # device_id
             elif i == len(fields)-20:
                 #cur_x.append(gbdt_id["i_"+fields[i]])
                 continue
+
+            # 用户id   
             elif i == len(fields)-7:
                 cur_x.append(id_stat["v_"+fields[i]])
             elif i > len(fields)-7:

@@ -29,13 +29,18 @@ def prep(input,output,isTest):
         uid = "??"
         for i in xrange(bias,len(lis)):
             name = chr(ord('a') + i - bias)
+
+            # device_ip
             if name == "j":
                 ip = name + "_" + lis[i]
                 rare = rare_d.get(ip)
+                # 用 rare 中 出现的次数代替
                 if rare != None:
                     lis[i] = "j_rare_" + str(rare)
                     #print lis[i]
                     continue
+
+            # device_id
             if name == "i":
                 id = name + "_" + lis[i]
                 rare = rare_d.get(id)
@@ -43,6 +48,8 @@ def prep(input,output,isTest):
                     lis[i] = "i_rare_" + str(rare)
                     #print lis[i]
                     continue
+
+            # addc 生成的 id        
             if name == "v":
                 id = name + "_" + lis[i]
                 uid = id
@@ -50,6 +57,8 @@ def prep(input,output,isTest):
                 if rare != None:
                     lis[i] = "v_rare_" + str(rare)
                     continue
+                    
+                # 只在一天出现过
                 elif id_day.get(id) == 1:
                     lis[i] = "v_id_s"
                     continue

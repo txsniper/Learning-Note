@@ -1,5 +1,6 @@
 import marshal
  
+ # ip和id出现的天数
 def stat(input,isTest):
     f = open(input)
     line = f.readline()
@@ -16,6 +17,7 @@ def stat(input,isTest):
         index = 12
         if isTest:
             index = 11
+
         ip = "j_" + lis[index]
         if ip in d_id:
             d_id[ip].add(lis[2][4:6])

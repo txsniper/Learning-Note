@@ -233,6 +233,7 @@ order_history['tm_hour_cos'] = order_history['tm_hour'].map(lambda x: math.cos((
 action=pd.concat([action_train,action_test])
 
 #增加历史订单
+# 从history中提取和action日志相同的字段，然后拼接在一起
 order_history_action=order_history[["userid","orderTime","orderType"]].copy()
 order_history_action.columns=["userid","actionTime","actionType"]
 order_history_action["actionType"]=order_history_action["actionType"].apply(lambda x:x+10)

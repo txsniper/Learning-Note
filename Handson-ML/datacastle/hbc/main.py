@@ -187,7 +187,7 @@ def rank(data, feat1, feat2, ascending):
 #encoding=utf8
 import pandas as pd
 import lightgbm as lgb
-from com_util import *
+#from com_util import *
 import re
 import time
 import numpy as np
@@ -288,12 +288,12 @@ data=feat_sum(data,order_history,["userid"],"orderType")
 
 for i in ["日本","美国","澳大利亚","新加坡","泰国"]:
     order_history_select=order_history[order_history.country==i]
-    print order_history_select.shape
+    print(order_history_select.shape)
     data=feat_count(data,order_history_select,["userid"],"orderid","%s_count"%i)
 
 for i in ["亚洲","欧洲","大洋洲","北美洲"]:
     order_history_select=order_history[order_history.continent==i]
-    print order_history_select.shape
+    print(order_history_select.shape)
     data=feat_count(data,order_history_select,["userid"],"orderid")
 
 #评论表
@@ -468,7 +468,7 @@ if not os.path.exists("../input/string_match.csv"):
 
         del action_str["last_%s_str"%i]
     del action_str["action_str"]
-    print action_str
+    print(action_str)
     action_str.to_csv("../input/string_match.csv",index=None)
 else:
     action_str=pd.read_csv("../input/string_match.csv")
@@ -489,7 +489,7 @@ X_test=pd.read_csv("../input/data_test.csv")
 X=pd.concat([X_train,X_test])
 data=data.merge(X,on="userid",how="left")
 
-print data.head()
+print(data.head())
 #################################
 valid=data[data.orderType==-1].copy()
 del valid["orderType"]
@@ -539,10 +539,10 @@ def stacking(clf,train_x,train_y,test_x,clf_name,class_num=1):
             test_pre[i, :]= model.predict(test_x, num_iteration=model.best_iteration).reshape((test_x.shape[0],1))
             cv_scores.append(roc_auc_score(te_y, pre))
 
-        print "%s now score is:"%clf_name,cv_scores
+        print("%s now score is:"%clf_name,cv_scores)
     test[:]=test_pre.mean(axis=0)
-    print "%s_score_list:"%clf_name,cv_scores
-    print "%s_score_mean:"%clf_name,np.mean(cv_scores)
+    print("%s_score_list:"%clf_name,cv_scores)
+    print("%s_score_mean:"%clf_name,np.mean(cv_scores))
     with open("score_cv.txt", "a") as f:
         f.write("%s now score is:" % clf_name + str(cv_scores) + "\n")
         f.write("%s_score_mean:"%clf_name+str(np.mean(cv_scores))+"\n")

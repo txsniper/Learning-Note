@@ -133,7 +133,6 @@ class LSTM_Model(nn.Module):
         x_emb = self.embedding(x)
         lstm_output, _ = self.lstm(x_emb)
         output = self.fc(lstm_output[:,-1,:])
-        out_prob = F.softmax(output.view(batch_size, self.output_dim), dim=1)
         return output
         
     '''
@@ -650,7 +649,7 @@ if __name__ == "__main__":
     train_file = dataset + "train.tsv"
     test_file = dataset + "test.tsv"
     pre_train_model_path = "/Users/sniper/data/glove.6B.100d.txt"
-    app = App(train_file, test_file, "LSTM", pre_train_model_path)
+    app = App(train_file, test_file, "BILSTM", pre_train_model_path)
     app.process()
     
     

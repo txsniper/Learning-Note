@@ -9,6 +9,7 @@ from torch.nn import functional as F
 
 
 import random
+torch.set_num_threads(32)
 
 class Util(object):
     @staticmethod

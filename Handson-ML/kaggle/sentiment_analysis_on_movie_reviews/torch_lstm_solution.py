@@ -1,10 +1,10 @@
 import numpy as np
 import pandas as pd
 
-from gensim import corpora
-from nltk.corpus import stopwords
-from nltk.tokenize import word_tokenize
-from nltk.stem import SnowballStemmer
+#from gensim import corpora
+#from nltk.corpus import stopwords
+#from nltk.tokenize import word_tokenize
+#from nltk.stem import SnowballStemmer
 
 import torch
 import torch.nn as nn
@@ -122,8 +122,7 @@ class LSTM_Model(nn.Module):
         else:
             self.embedding = nn.Embedding(
                 vocab_size,
-                input_dim,
-                padding_idx=0
+                input_dim
             )
         self.lstm = nn.LSTM(
             input_dim,
@@ -136,13 +135,12 @@ class LSTM_Model(nn.Module):
         self.fc = nn.Linear(hidden_dim, output_dim)
         self.output_dim = output_dim
 
-    def forward(self, x, length, mask=None):
-        batch_size = len(x)
+    def forward(self, x):
+        batch_size = x.size(0)
         x_emb = self.embedding(x)
         lstm_output, _ = self.lstm(x_emb)
         output = self.fc(lstm_output[:, -1, :])
-        out_prob = F.softmax(output.view(batch_size, self.output_dim), dim=1)
-        return out_prob
+        return output
 
 
 class SentimentRNN(nn.Module):
@@ -264,6 +262,18 @@ def get_model(vocab):
         max_len=50,
         dropout=0.0
     )
+    '''
+    model = LSTM_Model(
+        embeddings=None,
+        input_dim=256,
+        vocab_size=vocab['vocab_size'],
+        hidden_dim=128,
+        num_layers=1,
+        output_dim=5,
+        max_len=50,
+        dropout=0.0
+    )
+    '''
     return model
 
 
@@ -274,11 +284,11 @@ optimizer = optim.Adam(
     lr=0.002,
     weight_decay=1e-4)
 criterion = nn.CrossEntropyLoss()
-batch_size = 128
+batch_size = 512
 counter = 0
 print_every = 20
 clip = 5  # gradient clipping
-epochs = 3
+epochs = 10
 for i in range(epochs):
     num = len(train_X_padded)
     train_X_use = train_X_padded[0:num]
@@ -330,7 +340,8 @@ for i in range(epochs):
             print("Epoch: {}/{}...".format(i+1, epochs),
                     "Step: {}...".format(counter),
                     "Loss: {:.6f}...".format(loss.item()),
-                    "Val Loss: {:.6f}".format(np.mean(val_losses))
+                    "Val Loss: {:.6f}".format(np.mean(val_losses)),
+                    flush=True
             )
         
 test_losses = []
@@ -351,3 +362,19 @@ print("Test loss: {:.3f}".format(np.mean(test_losses)))
 # accuracy over all test data
 test_acc = num_correct/len(test_loader.dataset)
 print("Test accuracy: {:.3f}".format(test_acc))
+
+def save_res(test_pred):
+    df_test['Sentiment'] = test_pred.reshape(-1,1) 
+    header = ['PhraseId', 'Sentiment']
+    df_test.to_csv('./lstm_sentiment_copy.csv', columns=header, index=False, header=True)
+
+total_size = len(test_X_padded)
+sents_ = Variable(torch.LongTensor(test_X_padded).view(total_size, -1))
+pred = model(sents_)
+#print(pred[0:5])
+_, pred = torch.max(pred, 1)
+#print(pred[0:5])
+pred = pred.numpy()
+#print(pred[0:5])
+
+save_res(pred)

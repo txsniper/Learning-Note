@@ -1,27 +1,19 @@
 import numpy as np 
 import pandas as pd 
 
-from gensim import corpora
-from nltk.corpus import stopwords
-from nltk.tokenize import word_tokenize 
-from nltk.stem import SnowballStemmer
-
 import torch
 import torch.nn as nn
 import torch.optim as optim
 from torch.autograd import Variable
 from torch.nn import functional as F 
 
-import gensim
-from gensim.scripts.glove2word2vec import glove2word2vec
-from gensim.models import KeyedVectors
 
 import random
 
 class Util(object):
     @staticmethod
     def var_batch(batch_size, sents, sent_lens, sent_mask, max_len):
-        print("batch_size: " + str(len(sents)))
+        #print("batch_size: " + str(len(sents)))
         '''
         for sent in sents:
             print("sent len : " + str(len(sent)))
@@ -111,80 +103,6 @@ class Util(object):
         '''   
         return precision, recall, f1_score
 
-class SentimentRNN(nn.Module):
-    """
-    The RNN model that will be used to perform Sentiment analysis.
-    """
-
-    def __init__(self, vocab_size, output_size, embedding_dim, hidden_dim, n_layers, drop_prob=0.5):
-        """
-        Initialize the model by setting up the layers.
-        """
-        super(SentimentRNN, self).__init__()
-
-        self.output_size = output_size
-        self.n_layers = n_layers
-        self.hidden_dim = hidden_dim
-        
-        # embedding and LSTM layers
-        self.embedding = nn.Embedding(vocab_size, embedding_dim)
-        self.lstm = nn.LSTM(embedding_dim, hidden_dim, n_layers, 
-                            dropout=drop_prob, batch_first=True)
-        
-        # dropout layer
-        self.dropout = nn.Dropout(0.3)
-        
-        # linear
-        self.fc = nn.Linear(hidden_dim, output_size)
-    '''    
-    def forward(self, x, hidden):
-        """
-        Perform a forward pass of our model on some input and hidden state.
-        """
-        batch_size = x.size(0)
-
-        # embeddings and lstm_out
-        embeds = self.embedding(x)
-
-        lstm_out, hidden = self.lstm(embeds, hidden)
-
-        # transform lstm output to input size of linear layers
-        lstm_out = lstm_out.transpose(0,1)
-        lstm_out = lstm_out[-1]
-
-        out = self.dropout(lstm_out)
-        out = self.fc(out)        
-
-        return out, hidden
-    
-    def init_hidden(self, batch_size):
-        # Create two new tensors with sizes n_layers x batch_size x hidden_dim,
-        # initialized to zero, for hidden state and cell state of LSTM
-        weight = next(self.parameters()).data
-        hidden = (weight.new(self.n_layers, batch_size, self.hidden_dim).zero_(), 
-                  weight.new(self.n_layers, batch_size, self.hidden_dim).zero_())
-        return hidden
-    '''
-    def forward(self, x):
-        """
-        Perform a forward pass of our model on some input and hidden state.
-        """
-        batch_size = x.size(0)
-
-        # embeddings and lstm_out
-        embeds = self.embedding(x)
-
-        lstm_out, hidden = self.lstm(embeds)
-
-        # transform lstm output to input size of linear layers
-        lstm_out = lstm_out.transpose(0,1)
-        lstm_out = lstm_out[-1]
-
-        out = self.dropout(lstm_out)
-        out = self.fc(out)        
-        out_prob = F.softmax(out.view(batch_size, self.output_size), dim=1)
-        return out_prob
-                
 class LSTM_Model(nn.Module):
     def __init__(self, embeddings, input_dim, vocab_size, hidden_dim, num_layers, output_dim, max_len=100, dropout=0.5):
         super(LSTM_Model, self).__init__()
@@ -214,14 +132,9 @@ class LSTM_Model(nn.Module):
         batch_size = len(x)
         x_emb = self.embedding(x)
         lstm_output, _ = self.lstm(x_emb)
-        #print(lstm_output.shape)
-        #print(lstm_output[:,-1,:].shape)
         output = self.fc(lstm_output[:,-1,:])
-        #print(output.shape)
-        #lstm_output = lstm_output[-1]
-        #output = self.fc(lstm_output)
         out_prob = F.softmax(output.view(batch_size, self.output_dim), dim=1)
-        return out_prob
+        return output
         
     '''
     def forward(self, x, length, mask=None):
@@ -252,8 +165,8 @@ class LSTM_Model(nn.Module):
         last_output = lstm_output_pad[torch.LongTensor(range(batch_size)), length - 1]
         output = self.fc(last_output)
         #print(output)
-        out_prob = F.softmax(output.view(batch_size, self.output_dim), dim=1)
-        return out_prob
+        #out_prob = F.softmax(output.view(batch_size, self.output_dim), dim=1)
+        return output
     '''
         
 class LSTM(nn.Module):
@@ -306,8 +219,8 @@ class LSTM(nn.Module):
 
         representation = sentence_batch
         out = self.output(representation)
-        out_prob = F.softmax(out.view(batch_size, self.output_dim), dim=1)
-        return out_prob
+        #out_prob = F.softmax(out.view(batch_size, self.output_dim), dim=1)
+        return out
             
 class BiLSTM(nn.Module):
     def __init__(self, embeddings, input_dim, vocab_size, hidden_dim, output_dim, num_layers, max_len, dropout):
@@ -379,8 +292,8 @@ class BiLSTM(nn.Module):
 
         representation = sentence_batch
         out = self.output(representation)
-        out_prob = F.softmax(out.view(batch_size, self.output_dim), dim=1)
-        return out_prob
+        #out_prob = F.softmax(out.view(batch_size, self.output_dim), dim=1)
+        return out
                 
         
 class RNNModel(nn.Module):
@@ -477,9 +390,9 @@ class App(object):
         self.dropout = 0
         self.max_len = 50
         self.output_dim = 5
-        self.lr = 0.005
+        self.lr = 0.001
         self.valid_part = 0.2
-        self.epoch = 1
+        self.epoch = 3
     
     def get_pre_train_emb(self, pre_train_emb_file):
         with open(pre_train_emb_file) as f:
@@ -573,9 +486,11 @@ class App(object):
         probs = model(sentences_, sentences_seqlen_, sentences_mask_)
         loss = criterion(probs.view(len(labels_), -1), labels_)
         loss.backward()
+        clip = 5
+        nn.utils.clip_grad_norm_(model.parameters(), clip)
         optimizer.step()
     
-    def sentence_proc(self, sentence, stop_words, stemmer):
+    def sentence_proc(self, sentence):
         #tokens = word_tokenize(sentence)
         tokens = sentence.split(" ")
         res_words = tokens
@@ -585,9 +500,6 @@ class App(object):
         return res_words
 
     def text_process(self):
-        stop_words = set(stopwords.words('english'))
-        stop_words.update(['.', ',', '"', "'", ':', ';', '(', ')', '[', ']', '{', '}'])
-        stemmer = SnowballStemmer('english')
         
         raw_doc_train = self.train_data['Phrase'].values
         raw_doc_test = self.test_data['Phrase'].values
@@ -599,7 +511,7 @@ class App(object):
         word2idx["_padding"] = 0
         word2idx["_unk"] = 1
         for sentence in raw_doc_train:
-            res_words = self.sentence_proc(sentence, stop_words, stemmer)
+            res_words = self.sentence_proc(sentence)
             processed_train.append(res_words)
             index += 1
             if self.used_pre_train_emb is False:
@@ -609,7 +521,7 @@ class App(object):
         
         processed_test = []
         for sentence in raw_doc_test:
-            res_words = self.sentence_proc(sentence, stop_words, stemmer)
+            res_words = self.sentence_proc(sentence)
             processed_test.append(res_words)
             if self.used_pre_train_emb is False:
                 for word in res_words:
@@ -685,6 +597,12 @@ class App(object):
         train_X_padded, train_X_seq_len = self.sentence_pad(train_X_idx)
         test_X_padded, test_X_seq_len = self.sentence_pad(test_X_idx)
         return train_X_padded, train_X_seq_len, test_X_padded, test_X_seq_len, processed_train_label
+
+    def save_res(self, test_pred):
+        self.test_data['Sentiment'] = test_pred.reshape(-1,1) 
+        header = ['PhraseId', 'Sentiment']
+        self.test_data.to_csv('./lstm_my_sentiment.csv', columns=header, index=False, header=True)
+
         
     def process(self):
         if self.used_pre_train_emb:
@@ -702,15 +620,14 @@ class App(object):
             weight_decay=1e-5)
         '''
         optimizer = optim.Adam(
-            filter(lambda p: p.requires_grad, model.parameters()),
+            model.parameters(),
             lr=self.lr,
-            weight_decay=1e-4)
-        
+            weight_decay=1e-5)
         criterion = nn.CrossEntropyLoss()
         
         for i in range(self.epoch):
             print("epoch " + str(i))
-            train_X, train_X_seq_len, train_Y, valid_X, valid_X_seq_len, valid_Y = self.train_valid_set_split_static(train_X_padded, train_X_seq_len_padded, train_Y_padded)
+            train_X, train_X_seq_len, train_Y, valid_X, valid_X_seq_len, valid_Y = self.train_valid_set_split(train_X_padded, train_X_seq_len_padded, train_Y_padded)
             
             batch_num = int(len(train_X) / self.batch_size)
             for j in range(batch_num):
@@ -725,6 +642,7 @@ class App(object):
             print("test for epoch " + str(i))
             acc_score = self.test(model, valid_X, valid_X_seq_len, None, valid_Y)
         pred = self.test(model, test_X_padded, test_X_seq_len_padded, None, None)
+        self.save_res(pred)
         
 
 if __name__ == "__main__":

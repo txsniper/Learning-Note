@@ -385,14 +385,14 @@ class App(object):
         return model
     
     def get_parameter(self):
-        self.batch_size = 512
+        self.batch_size = 128
         self.hidden_dim = 128
         self.dropout = 0
         self.max_len = 50
         self.output_dim = 5
         self.lr = 0.001
         self.valid_part = 0.2
-        self.epoch = 3
+        self.epoch = 10
     
     def get_pre_train_emb(self, pre_train_emb_file):
         with open(pre_train_emb_file) as f:

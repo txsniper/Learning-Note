@@ -7,6 +7,9 @@ import torch.optim as optim
 from torch.autograd import Variable
 from torch.nn import functional as F 
 
+from nltk.corpus import stopwords
+from nltk.tokenize import word_tokenize 
+from nltk.stem import SnowballStemmer
 
 import random
 torch.set_num_threads(32)
@@ -490,16 +493,19 @@ class App(object):
         nn.utils.clip_grad_norm_(model.parameters(), clip)
         optimizer.step()
     
-    def sentence_proc(self, sentence):
+    def sentence_proc(self, sentence, stop_words, stemmer):
         #tokens = word_tokenize(sentence)
         tokens = sentence.split(" ")
         res_words = tokens
         res_words = [word.lower() for word in res_words]
-        #res_words = [ word for word in tokens if word not in stop_words]
-        #res_words = [stemmer.stem(word) for word in res_words]
+        res_words = [ word for word in tokens if word not in stop_words]
+        res_words = [stemmer.stem(word) for word in res_words]
         return res_words
 
     def text_process(self):
+        stop_words = set(stopwords.words('english'))
+        stop_words.update(['.', ',', '"', "'", ':', ';', '(', ')', '[', ']', '{', '}'])
+        stemmer = SnowballStemmer('english')
         
         raw_doc_train = self.train_data['Phrase'].values
         raw_doc_test = self.test_data['Phrase'].values

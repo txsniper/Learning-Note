@@ -517,7 +517,7 @@ class App(object):
         word2idx["_padding"] = 0
         word2idx["_unk"] = 1
         for sentence in raw_doc_train:
-            res_words = self.sentence_proc(sentence)
+            res_words = self.sentence_proc(sentence, stop_words, stemmer)
             processed_train.append(res_words)
             index += 1
             if self.used_pre_train_emb is False:
@@ -527,7 +527,7 @@ class App(object):
         
         processed_test = []
         for sentence in raw_doc_test:
-            res_words = self.sentence_proc(sentence)
+            res_words = self.sentence_proc(sentence, stop_words, stemmer)
             processed_test.append(res_words)
             if self.used_pre_train_emb is False:
                 for word in res_words:
